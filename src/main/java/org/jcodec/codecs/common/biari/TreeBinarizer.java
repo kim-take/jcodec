@@ -1,5 +1,4 @@
 package org.jcodec.codecs.common.biari;
-
 import java.io.IOException;
 
 /**
@@ -8,7 +7,7 @@ import java.io.IOException;
  * 
  * Binarization and context modeling using binary search tree
  * 
- * @author Jay Codec
+ * @author The JCodec project
  * 
  */
 public class TreeBinarizer {

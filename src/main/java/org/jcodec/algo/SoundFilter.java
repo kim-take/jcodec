@@ -2,6 +2,13 @@ package org.jcodec.algo;
 
 import org.jcodec.common.AudioFormat;
 
+/**
+ * This class is part of JCodec ( www.jcodec.org ) This software is distributed
+ * under FreeBSD License
+ * 
+ * @author The JCodec project
+ * 
+ */
 public class SoundFilter {
 
     public static final int[] sine = new int[] { 0, 1, 3, 4, 6, 7, 9, 10, 12, 14, 15, 17, 18, 20, 21, 23, 25, 26, 28,
@@ -82,18 +89,11 @@ public class SoundFilter {
         }
     }
 
-    public static void in(AudioFormat fmt, byte[] samples, int[] func) {
+    public static void _in(AudioFormat fmt, byte[] samples, int[] func) {
         in16BitSignedLE(samples, fmt.getChannels(), func);
     }
 
     public static void out(AudioFormat fmt, byte[] samples, int[] func) {
         out16BitSignedLE(samples, fmt.getChannels(), func);
     }
-
-    // public static void main(String[] args) {
-    // for (int i = 0; i < 512; i++)
-    // System.out.println(i + ",");
-    // // System.out.println((int) (Math.sin(2 * Math.PI * i / 2048) * 512) +
-    // // ",");
-    // }
 }

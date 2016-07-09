@@ -1,5 +1,4 @@
 package org.jcodec.codecs.common.biari;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -9,7 +8,7 @@ import java.nio.ByteBuffer;
  * 
  * H264 CABAC M-encoder
  * 
- * @author Jay Codec
+ * @author The JCodec project
  * 
  */
 public class MEncoder {

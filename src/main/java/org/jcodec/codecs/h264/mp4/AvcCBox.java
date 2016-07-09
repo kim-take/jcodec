@@ -1,13 +1,13 @@
 package org.jcodec.codecs.h264.mp4;
 
+import org.jcodec.common.Assert;
+import org.jcodec.common.io.NIOUtils;
+import org.jcodec.containers.mp4.boxes.Box;
+import org.jcodec.containers.mp4.boxes.Header;
+
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.jcodec.common.Assert;
-import org.jcodec.common.NIOUtils;
-import org.jcodec.containers.mp4.boxes.Box;
-import org.jcodec.containers.mp4.boxes.Header;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -15,7 +15,7 @@ import org.jcodec.containers.mp4.boxes.Header;
  * 
  * Creates MP4 file out of a set of samples
  * 
- * @author Jay Codec
+ * @author The JCodec project
  * 
  */
 public class AvcCBox extends Box {
@@ -23,34 +23,41 @@ public class AvcCBox extends Box {
     private int profile;
     private int profileCompat;
     private int level;
-
-    private List<ByteBuffer> spsList = new ArrayList<ByteBuffer>();
-    private List<ByteBuffer> ppsList = new ArrayList<ByteBuffer>();
     private int nalLengthSize;
 
-    public AvcCBox(Box other) {
-        super(other);
-    }
-
-    public AvcCBox() {
-        super(new Header(fourcc()));
-    }
+    private List<ByteBuffer> spsList;
+    private List<ByteBuffer> ppsList;
 
     public AvcCBox(Header header) {
         super(header);
-    }
-
-    public AvcCBox(int profile, int profileCompat, int level, List<ByteBuffer> spsList, List<ByteBuffer> ppsList) {
-        this();
-        this.profile = profile;
-        this.profileCompat = profileCompat;
-        this.level = level;
-        this.spsList = spsList;
-        this.ppsList = ppsList;
+        this.spsList = new ArrayList<ByteBuffer>();
+        this.ppsList = new ArrayList<ByteBuffer>();
     }
 
     public static String fourcc() {
         return "avcC";
+    }
+
+    public static AvcCBox parseAvcCBox(ByteBuffer buf) {
+        AvcCBox avcCBox = new AvcCBox(new Header(fourcc()));
+        avcCBox.parse(buf);
+        return avcCBox;
+    }
+
+    public static AvcCBox createEmpty() {
+        return new AvcCBox(new Header(fourcc()));
+    }
+    
+    public static AvcCBox createAvcCBox(int profile, int profileCompat, int level, int nalLengthSize,
+            List<ByteBuffer> spsList, List<ByteBuffer> ppsList) {
+        AvcCBox avcc = new AvcCBox(new Header(fourcc()));
+        avcc.profile = profile;
+        avcc.profileCompat = profileCompat;
+        avcc.level = level;
+        avcc.nalLengthSize = nalLengthSize;
+        avcc.spsList = spsList;
+        avcc.ppsList = ppsList;
+        return avcc;
     }
 
     @Override
@@ -79,7 +86,7 @@ public class AvcCBox extends Box {
     }
 
     @Override
-    protected void doWrite(ByteBuffer out) {
+    public void doWrite(ByteBuffer out) {
 
         out.put((byte) 0x1); // version
         out.put((byte) profile);
@@ -102,6 +109,18 @@ public class AvcCBox extends Box {
         }
     }
 
+    public int getProfile() {
+        return profile;
+    }
+
+    public int getProfileCompat() {
+        return profileCompat;
+    }
+
+    public int getLevel() {
+        return level;
+    }
+
     public List<ByteBuffer> getSpsList() {
         return spsList;
     }
@@ -113,4 +132,40 @@ public class AvcCBox extends Box {
     public int getNalLengthSize() {
         return nalLengthSize;
     }
+
+    //    public void toNAL(ByteBuffer codecPrivate) {
+    //        H264Utils.toNAL(codecPrivate, getSpsList(), getPpsList());
+    //    }
+    //    
+    //    public ByteBuffer toNAL() {
+    //        ByteBuffer bb = ByteBuffer.allocate(2048);
+    //        H264Utils.toNAL(bb, getSpsList(), getPpsList());
+    //        bb.flip();
+    //        return bb;
+    //    }
+    //
+    //    public static AvcCBox fromNAL(ByteBuffer codecPrivate) {
+    //        List<ByteBuffer> spsList = new ArrayList<ByteBuffer>();
+    //        List<ByteBuffer> ppsList = new ArrayList<ByteBuffer>();
+    //
+    //        ByteBuffer dup = codecPrivate.duplicate();
+    //
+    //        ByteBuffer buf;
+    //        SeqParameterSet sps = null;
+    //        while ((buf = H264Utils.nextNALUnit(dup)) != null) {
+    //            NALUnit nu = NALUnit.read(buf);
+    //            
+    //            H264Utils.unescapeNAL(buf);
+    //            
+    //            if (nu.type == NALUnitType.PPS) {
+    //                ppsList.add(buf);
+    //            } else if (nu.type == NALUnitType.SPS) {
+    //                spsList.add(buf);
+    //                sps = SeqParameterSet.read(buf.duplicate());
+    //            }
+    //        }
+    //        if (spsList.size() == 0 || ppsList.size() == 0)
+    //            return null;
+    //        return new AvcCBox(sps.profile_idc, 0, sps.level_idc, spsList, ppsList);
+    //    }
 }

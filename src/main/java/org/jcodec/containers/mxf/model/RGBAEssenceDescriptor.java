@@ -1,7 +1,9 @@
 package org.jcodec.containers.mxf.model;
+import java.util.Iterator;
+
+import org.jcodec.common.logging.Logger;
 
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -60,7 +62,7 @@ public class RGBAEssenceDescriptor extends GenericPictureEssenceDescriptor {
                 paletteLayout = _bb;
                 break;
             default:
-                System.out.println(String.format("Unknown tag [ RGBAEssenceDescriptor: " + ul + "]: %04x",
+                Logger.warn(String.format("Unknown tag [ " + ul + "]: %04x",
                         entry.getKey()));
                 continue;
             }

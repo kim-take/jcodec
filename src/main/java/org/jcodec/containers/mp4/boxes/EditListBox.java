@@ -4,8 +4,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jcodec.common.tools.ToJSON;
-
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
  * under FreeBSD License
@@ -20,17 +18,14 @@ public class EditListBox extends FullBox {
         return "elst";
     }
 
+    public static EditListBox createEditListBox(List<Edit> edits) {
+        EditListBox elst = new EditListBox(new Header(fourcc()));
+        elst.edits = edits;
+        return elst;
+    }
+
     public EditListBox(Header atom) {
         super(atom);
-    }
-
-    public EditListBox() {
-        this(new Header(fourcc()));
-    }
-
-    public EditListBox(List<Edit> edits) {
-        this();
-        this.edits = edits;
     }
 
     public void parse(ByteBuffer input) {
@@ -59,11 +54,5 @@ public class EditListBox extends FullBox {
 
     public List<Edit> getEdits() {
         return edits;
-    }
-
-    public void dump(StringBuilder sb) {
-        super.dump(sb);
-        sb.append(": ");
-        ToJSON.toJSON(this, sb, "edits");
     }
 }

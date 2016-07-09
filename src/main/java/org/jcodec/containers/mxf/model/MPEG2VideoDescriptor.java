@@ -1,7 +1,9 @@
 package org.jcodec.containers.mxf.model;
+import java.util.Iterator;
+
+import org.jcodec.common.logging.Logger;
 
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -60,7 +62,7 @@ public class MPEG2VideoDescriptor extends CDCIEssenceDescriptor {
                 maxGOP = _bb.getShort();
                 break;
             case 0x8007:
-                bPictureCount = (short)(_bb.get() & 0xff);
+                bPictureCount = (short) (_bb.get() & 0xff);
                 break;
             case 0x8008:
                 bitRate = _bb.getInt();
@@ -69,9 +71,7 @@ public class MPEG2VideoDescriptor extends CDCIEssenceDescriptor {
                 profileAndLevel = _bb.get();
                 break;
             default:
-                System.out.println(String.format(
-                        "Unknown tag [ MPEG2VideoDescriptor: " + ul + "]: %04x + (" + _bb.remaining() + ")",
-                        entry.getKey()));
+                Logger.warn(String.format("Unknown tag [ " + ul + "]: %04x + (" + _bb.remaining() + ")", entry.getKey()));
                 continue;
             }
             it.remove();

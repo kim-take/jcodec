@@ -1,5 +1,4 @@
 package org.jcodec.common.dct;
-
 import static java.lang.Math.PI;
 import static java.lang.Math.cos;
 import static java.lang.Math.round;
@@ -11,7 +10,7 @@ import org.jcodec.scale.ImageConvert;
  * This class is part of JCodec ( www.jcodec.org )
  * This software is distributed under FreeBSD License
  * 
- * @author Jay Codec
+ * @author The JCodec project
  *
  */
 public class SlowDCT extends DCT {

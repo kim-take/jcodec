@@ -1,12 +1,12 @@
 package org.jcodec.samples.mux;
 
-import static org.jcodec.codecs.h264.H264Utils.getPicHeightInMbs;
-import static org.jcodec.common.NIOUtils.writableFileChannel;
+import static org.jcodec.common.io.NIOUtils.writableChannel;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import org.jcodec.codecs.h264.H264Utils;
@@ -14,10 +14,13 @@ import org.jcodec.codecs.h264.MappedH264ES;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.mp4.AvcCBox;
-import org.jcodec.common.NIOUtils;
-import org.jcodec.common.SeekableByteChannel;
+import org.jcodec.common.io.NIOUtils;
+import org.jcodec.common.io.SeekableByteChannel;
 import org.jcodec.common.model.Packet;
 import org.jcodec.common.model.Size;
+import org.jcodec.common.model.TapeTimecode;
+import org.jcodec.common.tools.MainUtils;
+import org.jcodec.common.tools.MainUtils.Cmd;
 import org.jcodec.containers.mp4.MP4Packet;
 import org.jcodec.containers.mp4.TrackType;
 import org.jcodec.containers.mp4.boxes.SampleEntry;
@@ -31,24 +34,28 @@ import org.jcodec.containers.mp4.muxer.MP4Muxer;
  * Sample code. Muxes H.264 ( MPEG4 AVC ) elementary stream into MP4 ( ISO
  * 14496-1/14496-12/14496-14, Quicktime ) container
  * 
- * @author Jay Codec
+ * @author The JCodec project
  * 
  */
 public class AVCMP4Mux {
     private static AvcCBox avcC;
 
     public static void main(String[] args) throws Exception {
-        if (args.length < 2) {
-            System.out.println("Syntax: <in.264> <out.mp4>\n" + "\tWhere:\n"
-                    + "\t-q\tLook for stream parameters only in the beginning of stream");
-            return;
+        Cmd cmd = MainUtils.parseArguments(args);
+        if (cmd.argsLength() < 2) {
+            MainUtils.printHelpVarArgs(new HashMap<String, String>() {
+                {
+                    put("q", "Look for stream parameters only in the beginning of stream");
+                }
+            }, "in.264", "out.mp4");
+            System.exit(-1);
         }
 
-        File in = new File(args[0]);
-        File out = new File(args[1]);
+        File in = new File(cmd.getArg(0));
+        File out = new File(cmd.getArg(1));
 
-        SeekableByteChannel file = writableFileChannel(out);
-        MP4Muxer muxer = new MP4Muxer(file);
+        SeekableByteChannel file = writableChannel(out);
+        MP4Muxer muxer = MP4Muxer.createMP4MuxerToChannel(file);
         FramesMP4MuxerTrack track = muxer.addTrack(TrackType.VIDEO, 25);
 
         mux(track, in);
@@ -59,16 +66,17 @@ public class AVCMP4Mux {
     }
 
     private static void mux(FramesMP4MuxerTrack track, File f) throws IOException {
-        MappedH264ES es = new MappedH264ES(NIOUtils.map(f));
+        MappedH264ES es = new MappedH264ES(NIOUtils.mapFile(f));
 
         ArrayList<ByteBuffer> spsList = new ArrayList<ByteBuffer>();
         ArrayList<ByteBuffer> ppsList = new ArrayList<ByteBuffer>();
         Packet frame = null;
         while ((frame = es.nextFrame()) != null) {
-            ByteBuffer data = frame.getData();
-            H264Utils.wipePS(data, spsList, ppsList);
+            ByteBuffer data = NIOUtils.cloneBuffer(frame.getData());
+            H264Utils.wipePSinplace(data, spsList, ppsList);
             H264Utils.encodeMOVPacket(data);
-            MP4Packet pkt = new MP4Packet(new Packet(frame, data), frame.getPts(), 0);
+            MP4Packet pkt = MP4Packet.createMP4Packet(data, frame.getPts(), frame.getTimescale(), frame.getDuration(),
+                    frame.getFrameNo(), frame.isKeyFrame(), null, frame.getDisplayOrder(), frame.getPts(), 0);
             System.out.println(pkt.getFrameNo());
             track.addFrame(pkt);
         }
@@ -77,11 +85,11 @@ public class AVCMP4Mux {
 
     private static void addSampleEntry(FramesMP4MuxerTrack track, SeqParameterSet[] spss, PictureParameterSet[] ppss) {
         SeqParameterSet sps = spss[0];
-        Size size = new Size((sps.pic_width_in_mbs_minus1 + 1) << 4, getPicHeightInMbs(sps) << 4);
+        Size size = new Size((sps.pic_width_in_mbs_minus1 + 1) << 4, SeqParameterSet.getPicHeightInMbs(sps) << 4);
 
         SampleEntry se = MP4Muxer.videoSampleEntry("avc1", size, "JCodec");
 
-        avcC = new AvcCBox(sps.profile_idc, 0, sps.level_idc, write(spss), write(ppss));
+        avcC = AvcCBox.createAvcCBox(sps.profile_idc, 0, sps.level_idc, 4, write(spss), write(ppss));
         se.add(avcC);
         track.addSampleEntry(se);
     }

@@ -2,19 +2,20 @@ package org.jcodec.containers.mp4.boxes;
 
 import java.nio.ByteBuffer;
 
+/**
+ * This class is part of JCodec ( www.jcodec.org ) This software is distributed
+ * under FreeBSD License
+ * 
+ * @author The JCodec project
+ * 
+ */
 public class FielExtension extends Box {
+    public FielExtension(Header header) {
+        super(header);
+    }
+
     private int type;
     private int order;
-
-    public FielExtension(byte type, byte order) {
-        super(new Header(fourcc()));
-        this.type = type;
-        this.order = order;
-    }
-
-    public FielExtension() {
-        super(new Header(fourcc()));
-    }
 
     public static String fourcc() {
         return "fiel";
@@ -23,7 +24,7 @@ public class FielExtension extends Box {
     public boolean isInterlaced() {
         return type == 2;
     }
-    
+
     public boolean topFieldFirst() {
         return order == 1 || order == 6;
     }

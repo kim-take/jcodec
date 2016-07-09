@@ -1,5 +1,4 @@
 package org.jcodec.codecs.mjpeg;
-
 import org.jcodec.common.io.VLC;
 import org.jcodec.common.io.VLCBuilder;
 
@@ -7,7 +6,7 @@ import org.jcodec.common.io.VLCBuilder;
  * This class is part of JCodec ( www.jcodec.org )
  * This software is distributed under FreeBSD License
  * 
- * @author Jay Codec
+ * @author The JCodec project
  *
  */
 public class JpegConst {
@@ -449,7 +448,7 @@ public class JpegConst {
         names[0xdd] = "DRI";
     }
 
-    public static String toString(int marker) {
+    public static String markerToString(int marker) {
         return names[marker];
     }
 
@@ -524,4 +523,12 @@ public class JpegConst {
     public static final int COM = 0xfe;
     /** Define restart interval marker */
     public static final int DRI = 0xdd;
+    
+    
+    public static int[] DEFAULT_QUANT_LUMA = { 16, 11, 12, 14, 12, 10, 16, 14, 13, 14, 18, 17, 16, 19, 24, 40, 26, 24,
+            22, 22, 24, 49, 36, 37, 29, 40, 58, 51, 61, 60, 57, 51, 56, 55, 64, 72, 92, 78, 64, 68, 87, 69, 55, 56, 80,
+            109, 81, 87, 95, 62, 103, 104, 103, 98, 77, 113, 121, 112, 100, 120, 92, 101, 103, 99 };
+    public static int[] DEFAULT_QUANT_CHROMA = { 17, 18, 18, 24, 21, 24, 47, 26, 26, 47, 99, 66, 56, 66, 99, 99, 99,
+            99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+            99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99 };
 }

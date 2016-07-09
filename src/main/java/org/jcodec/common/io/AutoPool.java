@@ -1,10 +1,15 @@
 package org.jcodec.common.io;
 
+import static java.lang.System.currentTimeMillis;
+
+import java.lang.Runnable;
+import java.lang.Thread;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -15,21 +20,33 @@ import java.util.concurrent.TimeUnit;
  *
  */
 public class AutoPool {
-    private static AutoPool instance = new AutoPool();
-    private List<AutoResource> resources = Collections.synchronizedList(new ArrayList<AutoResource>());
+    private final List<AutoResource> resources;
     private ScheduledExecutorService scheduler;
 
     private AutoPool() {
-        scheduler = Executors.newScheduledThreadPool(1);
+        this.resources = Collections.synchronizedList(new ArrayList<AutoResource>());
+        scheduler = Executors.newScheduledThreadPool(1, daemonThreadFactory());
+        final List<AutoResource> res = resources;
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                long curTime = System.currentTimeMillis();
-                List<AutoResource> res = resources;
+                long curTime = currentTimeMillis();
                 for (AutoResource autoResource : res) {
                     autoResource.setCurTime(curTime);
                 }
             }
         }, 0, 100, TimeUnit.MILLISECONDS);
+    }
+
+    private ThreadFactory daemonThreadFactory() {
+        return new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread t = new Thread(r);
+                t.setDaemon(true);
+                t.setName(AutoPool.class.getName());
+                return t;
+            }
+        };
     }
 
     public static AutoPool getInstance() {
@@ -39,4 +56,6 @@ public class AutoPool {
     public void add(AutoResource res) {
         resources.add(res);
     }
+    
+    private static AutoPool instance = new AutoPool();
 }

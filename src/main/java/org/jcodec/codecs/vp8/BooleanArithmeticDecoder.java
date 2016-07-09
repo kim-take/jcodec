@@ -1,7 +1,13 @@
 package org.jcodec.codecs.vp8;
-
 import java.nio.ByteBuffer;
 
+/**
+ * This class is part of JCodec ( www.jcodec.org ) This software is distributed
+ * under FreeBSD License
+ * 
+ * @author The JCodec project
+ * 
+ */
 public class BooleanArithmeticDecoder {
         int bit_count; /* # of bits shifted out of value, at most 7 */
         ByteBuffer input;
@@ -10,11 +16,6 @@ public class BooleanArithmeticDecoder {
         int value; /* contains at least 24 significant bits */
         long callCounter=0;
         private String debugName;
-        
-        public BooleanArithmeticDecoder(ByteBuffer input, int offset, String debugName) {
-            this(input, offset);
-            this.debugName = debugName;
-        }
 
         public BooleanArithmeticDecoder(ByteBuffer input, int offset) {
             this.input = input;

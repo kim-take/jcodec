@@ -1,15 +1,18 @@
 package org.jcodec.movtool.streaming.tracks;
+import java.lang.IllegalStateException;
+import java.lang.System;
+
+
+import org.jcodec.common.io.NIOUtils;
+import org.jcodec.movtool.streaming.AudioCodecMeta;
+import org.jcodec.movtool.streaming.CodecMeta;
+import org.jcodec.movtool.streaming.VirtualPacket;
+import org.jcodec.movtool.streaming.VirtualTrack;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.jcodec.common.NIOUtils;
-import org.jcodec.containers.mp4.boxes.AudioSampleEntry;
-import org.jcodec.containers.mp4.boxes.SampleEntry;
-import org.jcodec.movtool.streaming.VirtualPacket;
-import org.jcodec.movtool.streaming.VirtualTrack;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -51,8 +54,8 @@ public class EditedPCMTrack implements VirtualTrack {
             }
         }
 
-        AudioSampleEntry ase = (AudioSampleEntry) src.getSampleEntry();
-        frameSize = ase.calcFrameSize();
+        AudioCodecMeta ase = (AudioCodecMeta) src.getCodecMeta();
+        frameSize = ase.getFrameSize();
         sampleRate = ase.getSampleRate();
 
     }
@@ -85,8 +88,8 @@ public class EditedPCMTrack implements VirtualTrack {
     }
 
     @Override
-    public SampleEntry getSampleEntry() {
-        return src.getSampleEntry();
+    public CodecMeta getCodecMeta() {
+        return src.getCodecMeta();
     }
 
     @Override

@@ -1,7 +1,9 @@
 package org.jcodec.containers.mxf.model;
+import java.util.Iterator;
+
+import org.jcodec.common.logging.Logger;
 
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -20,7 +22,7 @@ public class AES3PCMDescriptor extends WaveAudioDescriptor {
     private ByteBuffer fixedChannelStatusData;
     private ByteBuffer userDataMode;
     private ByteBuffer fixedUserData;
-    
+
     public AES3PCMDescriptor(UL ul) {
         super(ul);
     }
@@ -57,8 +59,7 @@ public class AES3PCMDescriptor extends WaveAudioDescriptor {
                 break;
 
             default:
-                System.out.println(String.format("Unknown tag [ AES3PCMDescriptor: " + ul + "]: %04x",
-                        entry.getKey()));
+                Logger.warn(String.format("Unknown tag [ " + ul + "]: %04x", entry.getKey()));
                 continue;
             }
             it.remove();

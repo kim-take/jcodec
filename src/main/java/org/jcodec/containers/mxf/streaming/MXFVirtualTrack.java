@@ -1,18 +1,14 @@
 package org.jcodec.containers.mxf.streaming;
+import java.lang.IllegalStateException;
+import java.lang.System;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
 
-import org.jcodec.common.NIOUtils;
-import org.jcodec.common.SeekableByteChannel;
+import org.jcodec.common.io.NIOUtils;
+import org.jcodec.common.io.SeekableByteChannel;
+import org.jcodec.common.model.Label;
 import org.jcodec.common.model.Rational;
 import org.jcodec.common.model.Size;
 import org.jcodec.containers.mp4.MP4Util;
-import org.jcodec.containers.mp4.boxes.EndianBox.Endian;
-import org.jcodec.containers.mp4.boxes.PixelAspectExt;
-import org.jcodec.containers.mp4.boxes.SampleEntry;
-import org.jcodec.containers.mp4.boxes.VideoSampleEntry;
-import org.jcodec.containers.mp4.muxer.MP4Muxer;
 import org.jcodec.containers.mxf.MXFConst.MXFCodecMapping;
 import org.jcodec.containers.mxf.MXFDemuxer;
 import org.jcodec.containers.mxf.MXFDemuxer.MXFDemuxerTrack;
@@ -23,9 +19,17 @@ import org.jcodec.containers.mxf.model.GenericSoundEssenceDescriptor;
 import org.jcodec.containers.mxf.model.KLV;
 import org.jcodec.containers.mxf.model.TimelineTrack;
 import org.jcodec.containers.mxf.model.UL;
+import org.jcodec.movtool.streaming.AudioCodecMeta;
+import org.jcodec.movtool.streaming.CodecMeta;
+import org.jcodec.movtool.streaming.VideoCodecMeta;
 import org.jcodec.movtool.streaming.VirtualPacket;
 import org.jcodec.movtool.streaming.VirtualTrack;
 import org.jcodec.movtool.streaming.tracks.ByteChannelPool;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.Arrays;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -57,30 +61,32 @@ public class MXFVirtualTrack implements VirtualTrack {
         if (nextFrame == null)
             return null;
 
-        return new MXFVirtualPacket(nextFrame);
+        return new MXFVirtualPacket(this, nextFrame);
     }
 
-    public class MXFVirtualPacket implements VirtualPacket {
+    public static class MXFVirtualPacket implements VirtualPacket {
         private MXFPacket pkt;
+		private MXFVirtualTrack track;
 
-        public MXFVirtualPacket(MXFPacket pkt) {
-            this.pkt = pkt;
+        public MXFVirtualPacket(MXFVirtualTrack track, MXFPacket pkt) {
+            this.track = track;
+			this.pkt = pkt;
         }
 
         @Override
         public ByteBuffer getData() throws IOException {
             SeekableByteChannel ch = null;
             try {
-                ch = fp.getChannel();
-                ch.position(pkt.getOffset());
+                ch = track.fp.getChannel();
+                ch.setPosition(pkt.getOffset());
 
                 KLV kl = KLV.readKL(ch);
-                while (kl != null && !essenceUL.equals(kl.key)) {
-                    ch.position(ch.position() + kl.len);
+                while (kl != null && !track.essenceUL.equals(kl.key)) {
+                    ch.setPosition(ch.position() + kl.len);
                     kl = KLV.readKL(ch);
                 }
 
-                return kl != null && essenceUL.equals(kl.key) ? NIOUtils.fetchFrom(ch, (int) kl.len) : null;
+                return kl != null && track.essenceUL.equals(kl.key) ? NIOUtils.fetchFromChannel(ch, (int) kl.len) : null;
             } finally {
                 NIOUtils.closeQuietly(ch);
             }
@@ -113,30 +119,29 @@ public class MXFVirtualTrack implements VirtualTrack {
     }
 
     @Override
-    public SampleEntry getSampleEntry() {
+    public CodecMeta getCodecMeta() {
         return toSampleEntry(track.getDescriptor());
     }
 
-    private SampleEntry toSampleEntry(GenericDescriptor d) {
+    private CodecMeta toSampleEntry(GenericDescriptor d) {
         if (track.isVideo()) {
             GenericPictureEssenceDescriptor ped = (GenericPictureEssenceDescriptor) d;
 
-            VideoSampleEntry se = MP4Muxer.videoSampleEntry(MP4Util.getFourcc(track.getCodec().getCodec()), new Size(
-                    ped.getDisplayWidth(), ped.getDisplayHeight()), "JCodec");
             Rational ar = ped.getAspectRatio();
-            se.add(new PixelAspectExt(
-                    new Rational((int) ((1000 * ar.getNum() * ped.getDisplayHeight()) / (ar.getDen() * ped
-                            .getDisplayWidth())), 1000)));
-
+            VideoCodecMeta se = VideoCodecMeta.createVideoCodecMeta(MP4Util.getFourcc(track.getCodec().getCodec()), null, new Size(
+                    ped.getDisplayWidth(), ped.getDisplayHeight()), new Rational((int) ((1000 * ar.getNum() * ped.getDisplayHeight()) / (ar.getDen() * ped
+                    .getDisplayWidth())), 1000));
             return se;
         } else if (track.isAudio()) {
             GenericSoundEssenceDescriptor sed = (GenericSoundEssenceDescriptor) d;
             int sampleSize = sed.getQuantizationBits() >> 3;
             MXFCodecMapping codec = track.getCodec();
+            Label[] labels = new Label[sed.getChannelCount()];
+            Arrays.fill(labels, Label.Mono);
 
-            return MP4Muxer.audioSampleEntry(sampleSize == 3 ? "in24" : "sowt", 0, sampleSize, sed.getChannelCount(),
-                    (int) sed.getAudioSamplingRate().asFloat(), codec == MXFCodecMapping.PCM_S16BE ? Endian.BIG_ENDIAN
-                            : Endian.LITTLE_ENDIAN);
+            return AudioCodecMeta.createAudioCodecMeta(sampleSize == 3 ? "in24" : "sowt", sampleSize, sed.getChannelCount(), (int) sed
+                    .getAudioSamplingRate().scalar(), codec == MXFCodecMapping.PCM_S16BE ? ByteOrder.BIG_ENDIAN
+            : ByteOrder.LITTLE_ENDIAN, true, labels, null);
         }
         throw new RuntimeException("Can't get sample entry");
     }
@@ -164,10 +169,10 @@ public class MXFVirtualTrack implements VirtualTrack {
         @Override
         protected MXFDemuxerTrack createTrack(UL ul, TimelineTrack track, GenericDescriptor descriptor)
                 throws IOException {
-            return new MXFDemuxerTrack(ul, track, descriptor) {
+            return new MXFDemuxerTrack(this, ul, track, descriptor) {
                 @Override
-                public MXFPacket readPacket(long off, int len, long pts, int timescale, int duration, int frameNo, boolean kf)
-                        throws IOException {
+                public MXFPacket readPacket(long off, int len, long pts, int timescale, int duration, int frameNo,
+                        boolean kf) throws IOException {
                     return new MXFPacket(null, pts, timescale, duration, frameNo, kf, null, off, len);
                 }
             };

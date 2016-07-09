@@ -1,15 +1,18 @@
 package org.jcodec.movtool.streaming.tracks;
+import java.lang.IllegalStateException;
+import java.lang.System;
+
+
+import org.jcodec.common.io.NIOUtils;
+import org.jcodec.movtool.streaming.AudioCodecMeta;
+import org.jcodec.movtool.streaming.CodecMeta;
+import org.jcodec.movtool.streaming.VirtualPacket;
+import org.jcodec.movtool.streaming.VirtualTrack;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.jcodec.common.NIOUtils;
-import org.jcodec.containers.mp4.boxes.AudioSampleEntry;
-import org.jcodec.containers.mp4.boxes.SampleEntry;
-import org.jcodec.movtool.streaming.VirtualPacket;
-import org.jcodec.movtool.streaming.VirtualTrack;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -25,19 +28,20 @@ public class PCMFlatternTrack implements VirtualTrack {
     private static final VirtualPacket[] EMPTY = new VirtualPacket[0];
     private int framesPerPkt;
     private VirtualTrack src;
-    private AudioSampleEntry se;
+    private AudioCodecMeta se;
     private int dataLen;
     private double packetDur;
     private VirtualPacket leftover;
     private int leftoverOffset;
     private int frameNo;
-    private List<VirtualPacket> pktBuffer = new ArrayList<VirtualPacket>();
+    private List<VirtualPacket> pktBuffer;
 
     public PCMFlatternTrack(VirtualTrack src, int samplesPerPkt) {
+        this.pktBuffer = new ArrayList<VirtualPacket>();
         this.framesPerPkt = samplesPerPkt;
         this.src = src;
-        this.se = (AudioSampleEntry) src.getSampleEntry();
-        this.dataLen = se.calcFrameSize() * framesPerPkt;
+        this.se = (AudioCodecMeta) src.getCodecMeta();
+        this.dataLen = se.getFrameSize() * framesPerPkt;
         this.packetDur = (double) framesPerPkt / se.getSampleRate();
     }
 
@@ -56,7 +60,7 @@ public class PCMFlatternTrack implements VirtualTrack {
                 pkt = src.nextPacket();
         } while (rem > 0 && pkt != null);
 
-        FlatternPacket result = new FlatternPacket(frameNo, pktBuffer.toArray(EMPTY), leftoverOffset, dataLen
+        FlatternPacket result = new FlatternPacket(this, frameNo, pktBuffer.toArray(EMPTY), leftoverOffset, dataLen
                 - Math.max(rem, 0));
         frameNo += framesPerPkt;
 
@@ -72,7 +76,7 @@ public class PCMFlatternTrack implements VirtualTrack {
     }
 
     @Override
-    public SampleEntry getSampleEntry() {
+    public CodecMeta getCodecMeta() {
         return se;
     }
 
@@ -81,14 +85,16 @@ public class PCMFlatternTrack implements VirtualTrack {
         src.close();
     }
 
-    private class FlatternPacket implements VirtualPacket {
+    private static class FlatternPacket implements VirtualPacket {
         private int frameNo;
         private int leading;
         private VirtualPacket[] pN;
         private int dataLen;
+		private PCMFlatternTrack track;
 
-        public FlatternPacket(int frameNo, VirtualPacket[] pN, int lead, int dataLen) {
-            this.frameNo = frameNo;
+        public FlatternPacket(PCMFlatternTrack track, int frameNo, VirtualPacket[] pN, int lead, int dataLen) {
+            this.track = track;
+			this.frameNo = frameNo;
             this.leading = lead;
             this.pN = pN;
             this.dataLen = dataLen;
@@ -104,7 +110,7 @@ public class PCMFlatternTrack implements VirtualTrack {
             for (int i = 1; i < pN.length && result.hasRemaining(); i++) {
                 ByteBuffer dN = pN[i].getData();
                 int toWrite = Math.min(dN.remaining(), result.remaining());
-                NIOUtils.write(result, dN, toWrite);
+                NIOUtils.writeL(result, dN, toWrite);
             }
             result.flip();
             return result;
@@ -117,12 +123,12 @@ public class PCMFlatternTrack implements VirtualTrack {
 
         @Override
         public double getPts() {
-            return ((double) frameNo * framesPerPkt) / se.getSampleRate();
+            return ((double) frameNo * track.framesPerPkt) / track.se.getSampleRate();
         }
 
         @Override
         public double getDuration() {
-            return packetDur;
+            return track.packetDur;
         }
 
         @Override

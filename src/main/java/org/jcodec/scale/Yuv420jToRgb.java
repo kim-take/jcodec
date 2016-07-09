@@ -3,6 +3,14 @@ package org.jcodec.scale;
 import org.jcodec.common.model.Picture;
 import org.jcodec.common.tools.MathUtil;
 
+/**
+ * This class is part of JCodec ( www.jcodec.org ) This software is distributed
+ * under FreeBSD License
+ * 
+ * @author The JCodec project
+ * 
+ */
+@Deprecated
 public class Yuv420jToRgb implements Transform {
 
     public Yuv420jToRgb() {
@@ -79,8 +87,8 @@ public class Yuv420jToRgb implements Transform {
         int r = (y + add_r) >> SCALEBITS;
         int g = (y + add_g) >> SCALEBITS;
         int b = (y + add_b) >> SCALEBITS;
-        data[off] = MathUtil.clip(b, 0, 255);
+        data[off] = MathUtil.clip(r, 0, 255);
         data[off + 1] = MathUtil.clip(g, 0, 255);
-        data[off + 2] = MathUtil.clip(r, 0, 255);
+        data[off + 2] = MathUtil.clip(b, 0, 255);
     }
 }

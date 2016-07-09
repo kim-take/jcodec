@@ -1,21 +1,20 @@
 package org.jcodec.movtool.streaming.tracks;
+import java.lang.IllegalStateException;
+import java.lang.System;
+
+
+import org.jcodec.codecs.wav.WavHeader;
+import org.jcodec.common.AudioFormat;
+import org.jcodec.common.io.NIOUtils;
+import org.jcodec.common.io.SeekableByteChannel;
+import org.jcodec.common.model.Label;
+import org.jcodec.movtool.streaming.AudioCodecMeta;
+import org.jcodec.movtool.streaming.CodecMeta;
+import org.jcodec.movtool.streaming.VirtualPacket;
+import org.jcodec.movtool.streaming.VirtualTrack;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-
-import org.jcodec.codecs.wav.WavHeader;
-import org.jcodec.common.NIOUtils;
-import org.jcodec.common.SeekableByteChannel;
-import org.jcodec.containers.mp4.boxes.AudioSampleEntry;
-import org.jcodec.containers.mp4.boxes.ChannelBox;
-import org.jcodec.containers.mp4.boxes.EndianBox.Endian;
-import org.jcodec.containers.mp4.boxes.SampleEntry;
-import org.jcodec.containers.mp4.boxes.channel.ChannelUtils;
-import org.jcodec.containers.mp4.boxes.channel.Label;
-import org.jcodec.containers.mp4.muxer.MP4Muxer;
-import org.jcodec.movtool.streaming.VirtualPacket;
-import org.jcodec.movtool.streaming.VirtualTrack;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -32,7 +31,7 @@ public class WavTrack implements VirtualTrack {
 
     private ByteChannelPool pool;
     private WavHeader header;
-    private AudioSampleEntry se;
+    private AudioCodecMeta se;
     private int pktDataLen;
     private double pktDuration;
 
@@ -44,30 +43,20 @@ public class WavTrack implements VirtualTrack {
 
     private long size;
 
-    public WavTrack(ByteChannelPool pool, Label... labels) throws IOException {
+    public WavTrack(ByteChannelPool pool, Label[] labels) throws IOException {
         this.pool = pool;
 
         SeekableByteChannel ch = null;
         try {
             ch = pool.getChannel();
-            header = WavHeader.read(Channels.newInputStream(ch));
+            header = WavHeader.readChannel(ch);
             size = header.dataSize <= 0 ? ch.size() : header.dataSize;
         } finally {
             ch.close();
         }
 
-        se = MP4Muxer.audioSampleEntry("sowt", 1, header.fmt.bitsPerSample >> 3, header.fmt.numChannels,
-                header.fmt.sampleRate, Endian.LITTLE_ENDIAN);
-        ChannelBox chan = new ChannelBox();
-        if (labels != null && labels.length > 0) {
-            ChannelUtils.setLabels(labels, chan);
-        } else {
-            labels = new Label[header.getFormat().getChannels()];
-            for (int i = 0; i < labels.length; i++)
-                labels[i] = Label.Mono;
-            ChannelUtils.setLabels(labels, chan);
-        }
-        se.add(chan);
+        se = AudioCodecMeta.createAudioCodecMeta3("sowt", ByteBuffer.allocate(0), new AudioFormat(header.fmt.sampleRate,
+                header.fmt.bitsPerSample >> 3, header.fmt.numChannels, true, false), true, labels);
 
         pktDataLen = FRAMES_PER_PKT * header.fmt.numChannels * (header.fmt.bitsPerSample >> 3);
         pktDuration = (double) FRAMES_PER_PKT / header.fmt.sampleRate;
@@ -82,7 +71,7 @@ public class WavTrack implements VirtualTrack {
         if (offset >= size)
             return null;
 
-        WavPacket pkt = new WavPacket(frameNo, pts, offset, (int) Math.min(size - offset, pktDataLen));
+        WavPacket pkt = new WavPacket(this, frameNo, pts, offset, (int) Math.min(size - offset, pktDataLen));
 
         offset += pktDataLen;
         frameNo += FRAMES_PER_PKT;
@@ -92,7 +81,7 @@ public class WavTrack implements VirtualTrack {
     }
 
     @Override
-    public SampleEntry getSampleEntry() {
+    public CodecMeta getCodecMeta() {
         return se;
     }
 
@@ -111,14 +100,16 @@ public class WavTrack implements VirtualTrack {
         pool.close();
     }
 
-    public class WavPacket implements VirtualPacket {
+    public static class WavPacket implements VirtualPacket {
         private int frameNo;
         private double pts;
         private long offset;
         private int dataLen;
+		private WavTrack track;
 
-        public WavPacket(int frameNo, double pts, long offset, int dataLen) {
-            this.frameNo = frameNo;
+        public WavPacket(WavTrack track, int frameNo, double pts, long offset, int dataLen) {
+            this.track = track;
+			this.frameNo = frameNo;
             this.pts = pts;
             this.offset = offset;
             this.dataLen = dataLen;
@@ -128,10 +119,10 @@ public class WavTrack implements VirtualTrack {
         public ByteBuffer getData() throws IOException {
             SeekableByteChannel ch = null;
             try {
-                ch = pool.getChannel();
-                ch.position(offset);
+                ch = track.pool.getChannel();
+                ch.setPosition(offset);
                 ByteBuffer buffer = ByteBuffer.allocate(dataLen);
-                NIOUtils.read(ch, buffer);
+                NIOUtils.readFromChannel(ch, buffer);
                 buffer.flip();
                 return buffer;
             } finally {
@@ -151,7 +142,7 @@ public class WavTrack implements VirtualTrack {
 
         @Override
         public double getDuration() {
-            return pktDuration;
+            return track.pktDuration;
         }
 
         @Override

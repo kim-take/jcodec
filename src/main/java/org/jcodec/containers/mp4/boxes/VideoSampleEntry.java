@@ -1,12 +1,9 @@
 package org.jcodec.containers.mp4.boxes;
 
-import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Map;
+import org.jcodec.common.JCodecUtil2;
+import org.jcodec.common.io.NIOUtils;
 
-import org.jcodec.common.NIOUtils;
-import org.jcodec.common.JCodecUtil;
-import org.jcodec.common.tools.ToJSON;
+import java.nio.ByteBuffer;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -18,7 +15,27 @@ import org.jcodec.common.tools.ToJSON;
  * 
  */
 public class VideoSampleEntry extends SampleEntry {
-    private static final MyFactory FACTORY = new MyFactory();
+    public static VideoSampleEntry createVideoSampleEntry(Header atom, short version, short revision, String vendor,
+            int temporalQual, int spacialQual, short width, short height, long hRes, long vRes, short frameCount,
+            String compressorName, short depth, short drefInd, short clrTbl) {
+        VideoSampleEntry e = new VideoSampleEntry(atom);
+        e.drefInd = drefInd;
+        e.version = version;
+        e.revision = revision;
+        e.vendor = vendor;
+        e.temporalQual = temporalQual;
+        e.spacialQual = spacialQual;
+        e.width = width;
+        e.height = height;
+        e.hRes = hRes;
+        e.vRes = vRes;
+        e.frameCount = frameCount;
+        e.compressorName = compressorName;
+        e.depth = depth;
+        e.clrTbl = clrTbl;
+        return e;
+    }
+
     private short version;
     private short revision;
     private String vendor;
@@ -33,29 +50,8 @@ public class VideoSampleEntry extends SampleEntry {
     private short depth;
     private short clrTbl;
 
-    public VideoSampleEntry(Header atom, short version, short revision, String vendor, int temporalQual,
-            int spacialQual, short width, short height, long hRes, long vRes, short frameCount, String compressorName,
-            short depth, short drefInd, short clrTbl) {
-        super(atom, drefInd);
-        factory = FACTORY;
-        this.version = version;
-        this.revision = revision;
-        this.vendor = vendor;
-        this.temporalQual = temporalQual;
-        this.spacialQual = spacialQual;
-        this.width = width;
-        this.height = height;
-        this.hRes = hRes;
-        this.vRes = vRes;
-        this.frameCount = frameCount;
-        this.compressorName = compressorName;
-        this.depth = depth;
-        this.clrTbl = clrTbl;
-    }
-
     public VideoSampleEntry(Header atom) {
         super(atom);
-        factory = FACTORY;
     }
 
     public void parse(ByteBuffer input) {
@@ -77,7 +73,7 @@ public class VideoSampleEntry extends SampleEntry {
 
         frameCount = input.getShort();
 
-        compressorName = NIOUtils.readPascalString(input, 31);
+        compressorName = NIOUtils.readPascalStringL(input, 31);
 
         depth = input.getShort();
 
@@ -93,7 +89,7 @@ public class VideoSampleEntry extends SampleEntry {
 
         out.putShort(version);
         out.putShort(revision);
-        out.put(JCodecUtil.asciiString(vendor), 0, 4);
+        out.put(JCodecUtil2.asciiString(vendor), 0, 4);
         out.putInt(temporalQual);
         out.putInt(spacialQual);
 
@@ -107,7 +103,7 @@ public class VideoSampleEntry extends SampleEntry {
 
         out.putShort(frameCount);
 
-        NIOUtils.writePascalString(out, compressorName, 31);
+        NIOUtils.writePascalStringL(out, compressorName, 31);
 
         out.putShort(depth);
 
@@ -148,32 +144,23 @@ public class VideoSampleEntry extends SampleEntry {
         return vendor;
     }
 
-    public static class MyFactory extends BoxFactory {
-        private Map<String, Class<? extends Box>> mappings = new HashMap<String, Class<? extends Box>>();
-
-        public MyFactory() {
-            mappings.put(PixelAspectExt.fourcc(), PixelAspectExt.class);
-            // mappings.put(AvcCBox.fourcc(), AvcCBox.class);
-            mappings.put(ColorExtension.fourcc(), ColorExtension.class);
-            mappings.put(GamaExtension.fourcc(), GamaExtension.class);
-            mappings.put(CleanApertureExtension.fourcc(), CleanApertureExtension.class);
-            mappings.put(FielExtension.fourcc(), FielExtension.class);
-        }
-
-        public Class<? extends Box> toClass(String fourcc) {
-            return mappings.get(fourcc);
-        }
+    public short getVersion() {
+        return version;
     }
 
-    @Override
-    public void dump(StringBuilder sb) {
-        sb.append(header.getFourcc() + ": {\n");
-        sb.append("entry: ");
-        ToJSON.toJSON(this, sb, "version", "revision", "vendor", "temporalQual", "spacialQual", "width", "height",
-                "hRes", "vRes", "frameCount", "compressorName", "depth", "clrTbl");
-        sb.append(",\nexts: [\n");
-        dumpBoxes(sb);
-        sb.append("\n]\n");
-        sb.append("}\n");
+    public short getRevision() {
+        return revision;
+    }
+
+    public int getTemporalQual() {
+        return temporalQual;
+    }
+
+    public int getSpacialQual() {
+        return spacialQual;
+    }
+
+    public short getClrTbl() {
+        return clrTbl;
     }
 }

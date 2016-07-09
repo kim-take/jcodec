@@ -1,8 +1,7 @@
 package org.jcodec.codecs.common.biari;
+import org.jcodec.codecs.vpx.VPXConst;
 
 import java.nio.ByteBuffer;
-
-import org.jcodec.codecs.vpx.VPXConst;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -31,7 +30,7 @@ public class VPxBooleanEncoder {
 
         if (bb != 0) {
             lowvalue += split;
-            range = range - split;
+            range -= split;
         } else {
             range = split;
         }
@@ -69,5 +68,9 @@ public class VPxBooleanEncoder {
 
         for (i = 0; i < 32; i++)
             writeBit(128, 0);
+    }
+
+    public int position() {
+        return out.position() + ((count + 24) >> 3);
     }
 }

@@ -2,14 +2,15 @@ package org.jcodec.codecs.h264.decode;
 
 import static org.jcodec.common.tools.Debug.trace;
 
-import org.jcodec.codecs.h264.H264Utils;
+import org.jcodec.codecs.h264.H264Utils2;
 import org.jcodec.common.io.BitReader;
+import org.jcodec.common.tools.Debug;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
  * under FreeBSD License
  * 
- * @author Jay Codec
+ * @author The JCodec project
  * 
  */
 public class CAVLCReader {
@@ -28,7 +29,7 @@ public class CAVLCReader {
 
     public static int readUE(BitReader bits)  {
         int cnt = 0;
-        while (bits.read1Bit() == 0 && cnt < 31)
+        while (bits.read1Bit() == 0 && cnt < 32)
             cnt++;
 
         int res = 0;
@@ -41,7 +42,7 @@ public class CAVLCReader {
         return res;
     }
 
-    public static int readUE(BitReader bits, String message)  {
+    public static int readUEtrace(BitReader bits, String message)  {
         int res = readUE(bits);
 
         trace(message, res);
@@ -52,7 +53,7 @@ public class CAVLCReader {
     public static int readSE(BitReader bits, String message)  {
         int val = readUE(bits);
 
-        val = H264Utils.golomb2Signed(val);
+        val = H264Utils2.golomb2Signed(val);
 
         trace(message, val);
 
@@ -79,7 +80,7 @@ public class CAVLCReader {
     }
 
     public static int readME(BitReader bits, String string)  {
-        return readUE(bits, string);
+        return readUEtrace(bits, string);
     }
 
     public static int readZeroBitCount(BitReader bits, String message)  {
@@ -87,7 +88,8 @@ public class CAVLCReader {
         while (bits.read1Bit() == 0 && count < 32)
             count++;
 
-        trace(message, String.valueOf(count));
+        if (Debug.debug)
+            trace(message, String.valueOf(count));
 
         return count;
     }

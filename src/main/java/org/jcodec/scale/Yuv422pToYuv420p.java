@@ -1,4 +1,5 @@
 package org.jcodec.scale;
+import static java.lang.System.arraycopy;
 
 import org.jcodec.common.model.Picture;
 
@@ -18,10 +19,10 @@ public class Yuv422pToYuv420p implements Transform {
         this.shiftUp = shiftUp;
         this.shiftDown = shiftDown;
     }
-
+    
     public void transform(Picture src, Picture dst) {
         int lumaSize = src.getWidth() * src.getHeight();
-        System.arraycopy(src.getPlaneData(0), 0, dst.getPlaneData(0), 0, lumaSize);
+        arraycopy(src.getPlaneData(0), 0, dst.getPlaneData(0), 0, lumaSize);
         copyAvg(src.getPlaneData(1), dst.getPlaneData(1), src.getPlaneWidth(1), src.getPlaneHeight(1));
         copyAvg(src.getPlaneData(2), dst.getPlaneData(2), src.getPlaneWidth(2), src.getPlaneHeight(2));
 

@@ -1,17 +1,16 @@
 package org.jcodec.codecs.h264.io.write;
+import org.jcodec.codecs.h264.io.model.NALUnit;
+import org.jcodec.common.io.NIOUtils;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 
-import org.jcodec.codecs.h264.io.model.NALUnit;
-import org.jcodec.common.NIOUtils;
-
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
  * under FreeBSD License
  * 
- * @author Jay Codec
+ * @author The JCodec project
  * 
  */
 public class NALUnitWriter {

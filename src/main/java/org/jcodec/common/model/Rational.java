@@ -1,6 +1,11 @@
 package org.jcodec.common.model;
 
-import static org.jcodec.common.StringUtils.split;
+import static org.jcodec.common.StringUtils.splitS;
+import static org.jcodec.common.model.RationalLarge.reduceLong;
+
+import org.jcodec.common.tools.MathUtil;
+
+
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -13,8 +18,17 @@ public class Rational {
 
     public static final Rational ONE = new Rational(1, 1);
     public static final Rational HALF = new Rational(1, 2);
-    private final int num;
-    private final int den;
+    public static final Rational ZERO = new Rational(0, 1);
+    final int num;
+    final int den;
+
+    public static Rational R(int num, int den) {
+        return new Rational(num, den);
+    }
+
+    public static Rational R1(int num) {
+        return R(num, 1);
+    }
 
     public Rational(int num, int den) {
         this.num = num;
@@ -30,8 +44,9 @@ public class Rational {
     }
 
     public static Rational parse(String string) {
-        String[] split = split(string, ":");
-        return new Rational(Integer.parseInt(split[0]), Integer.parseInt(split[1]));
+        String[] split = splitS(string, ":");
+        return split.length > 1 ? Rational.R(Integer.parseInt(split[0]), Integer.parseInt(split[1])) : Rational.R(
+                Integer.parseInt(string), 1);
     }
 
     @Override
@@ -71,20 +86,16 @@ public class Rational {
         return num / (den * val);
     }
 
-    public long multiply(long val) {
+    public long multiplyLong(long val) {
         return (num * val) / den;
     }
 
-    public long divide(long val) {
+    public long divideLong(long val) {
         return (den * val) / num;
     }
 
     public Rational flip() {
         return new Rational(den, num);
-    }
-
-    public static RationalLarge R(long num, long den) {
-        return new RationalLarge(num, den);
     }
 
     public boolean smallerThen(Rational sec) {
@@ -103,51 +114,84 @@ public class Rational {
         return num * sec.den >= sec.num * den;
     }
 
-    public boolean equals(Rational other) {
+    public boolean equalsRational(Rational other) {
         return num * other.den == other.num * den;
     }
 
     public Rational plus(Rational other) {
-        return new Rational(num * other.den + other.num * den, den * other.den);
+        return reduce(num * other.den + other.num * den, den * other.den);
+    }
+
+    public RationalLarge plusLarge(RationalLarge other) {
+        return reduceLong(num * other.den + other.num * den, den * other.den);
     }
 
     public Rational minus(Rational other) {
-        return new Rational(num * other.den - other.num * den, den * other.den);
+        return reduce(num * other.den - other.num * den, den * other.den);
     }
 
-    public Rational plus(int scalar) {
+    public RationalLarge minusLarge(RationalLarge other) {
+        return reduceLong(num * other.den - other.num * den, den * other.den);
+    }
+
+    public Rational plusInt(int scalar) {
         return new Rational(num + scalar * den, den);
     }
 
-    public Rational minus(int scalar) {
+    public Rational minusInt(int scalar) {
         return new Rational(num - scalar * den, den);
     }
 
-    public Rational multiply(int scalar) {
+    public Rational multiplyInt(int scalar) {
         return new Rational(num * scalar, den);
     }
 
-    public Rational divide(int scalar) {
+    public Rational divideInt(int scalar) {
         return new Rational(den * scalar, num);
     }
 
-    public Rational divideBy(int scalar) {
+    public Rational divideByInt(int scalar) {
         return new Rational(num, den * scalar);
     }
 
     public Rational multiply(Rational other) {
-        return new Rational(num * other.num, den * other.den);
+        return reduce(num * other.num, den * other.den);
+    }
+
+    public RationalLarge multiplyLarge(RationalLarge other) {
+        return reduceLong(num * other.num, den * other.den);
     }
 
     public Rational divide(Rational other) {
-        return new Rational(other.num * den, other.den * num);
+        return reduce(other.num * den, other.den * num);
+    }
+
+    public RationalLarge divideLarge(RationalLarge other) {
+        return reduceLong(other.num * den, other.den * num);
     }
 
     public Rational divideBy(Rational other) {
-        return new Rational(num * other.den, den * other.num);
+        return reduce(num * other.den, den * other.num);
     }
 
-    public float asFloat() {
+    public RationalLarge divideByLarge(RationalLarge other) {
+        return reduceLong(num * other.den, den * other.num);
+    }
+
+    public float scalar() {
         return (float) num / den;
+    }
+
+    public int scalarClip() {
+        return num / den;
+    }
+
+    public static Rational reduce(int num, int den) {
+        int gcd = MathUtil.gcd(num, den);
+        return new Rational(num / gcd, den / gcd);
+    }
+
+    public static Rational reduceRational(Rational r) {
+        return reduce(r.getNum(), r.getDen());
     }
 }

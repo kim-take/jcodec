@@ -1,8 +1,6 @@
 package org.jcodec.codecs.h264.io;
-
 import static org.jcodec.codecs.h264.decode.CAVLCReader.readU;
 import static org.jcodec.codecs.h264.decode.CAVLCReader.readZeroBitCount;
-import static org.jcodec.common.model.ColorSpace.YUV420;
 import static org.jcodec.common.model.ColorSpace.YUV422;
 import static org.jcodec.common.model.ColorSpace.YUV444;
 
@@ -46,7 +44,7 @@ public class CAVLC {
         tokensTop = new int[mbWidth << mbW];
     }
 
-    public void writeACBlock(BitWriter out, int blkIndX, int blkIndY, MBType leftMBType, MBType topMBType, int[] coeff,
+    public int writeACBlock(BitWriter out, int blkIndX, int blkIndY, MBType leftMBType, MBType topMBType, int[] coeff,
             VLC[] totalZerosTab, int firstCoeff, int maxCoeff, int[] scan) {
         VLC coeffTokenTab = getCoeffTokenVLCForLuma(blkIndX != 0, leftMBType, tokensLeft[blkIndY & mbMask],
                 blkIndY != 0, topMBType, tokensTop[blkIndX]);
@@ -55,6 +53,8 @@ public class CAVLC {
 
         tokensLeft[blkIndY & mbMask] = coeffToken;
         tokensTop[blkIndX] = coeffToken;
+
+        return coeffToken;
     }
 
     public void writeChrDCBlock(BitWriter out, int[] coeff, VLC[] totalZerosTab, int firstCoeff, int maxCoeff,
@@ -91,7 +91,7 @@ public class CAVLC {
                 && Math.abs(levels[totalCoeff - trailingOnes - 1]) == 1; trailingOnes++)
             ;
 
-        int coeffToken = coeffToken(totalCoeff, trailingOnes);
+        int coeffToken = H264Const.coeffToken(totalCoeff, trailingOnes);
 
         coeffTokenTab.writeVLC(out, coeffToken);
 
@@ -162,7 +162,7 @@ public class CAVLC {
 
         int nc = codeTableLuma(leftAvailable, leftMBType, leftToken, topAvailable, topMBType, topToken);
 
-        return H264Const.coeffToken[Math.min(nc, 8)];
+        return H264Const.CoeffToken[Math.min(nc, 8)];
     }
 
     public VLC getCoeffTokenVLCForChromaDC() {
@@ -186,22 +186,23 @@ public class CAVLC {
     }
 
     protected VLC codeTableChromaDC() {
-        if (color == YUV420) {
+        if (color == ColorSpace.YUV420J) {
             return H264Const.coeffTokenChromaDCY420;
         } else if (color == YUV422) {
             return H264Const.coeffTokenChromaDCY422;
         } else if (color == YUV444) {
-            return H264Const.coeffToken[0];
+            return H264Const.CoeffToken[0];
         }
         return null;
     }
 
-    public int readCoeffs(BitReader in, VLC coeffTokenTab, VLC[] totalZerosTab, int[] coeffLevel, int firstCoeff,
+    public int readCoeffs(BitReader _in, VLC coeffTokenTab, VLC[] totalZerosTab, int[] coeffLevel, int firstCoeff,
             int nCoeff, int[] zigzag) {
-        int coeffToken = coeffTokenTab.readVLC(in);
+        int coeffToken = coeffTokenTab.readVLC(_in);
         int totalCoeff = totalCoeff(coeffToken);
         int trailingOnes = trailingOnes(coeffToken);
-//        System.out.println("Coeff token. Total: " + totalCoeff + ", trailOne: " + trailingOnes);
+        // System.out.println("Coeff token. Total: " + totalCoeff +
+        // ", trailOne: " + trailingOnes);
 
         // blockType.getMaxCoeffs();
         // if (blockType == BlockType.BLOCK_CHROMA_DC)
@@ -213,10 +214,10 @@ public class CAVLC {
             int[] level = new int[totalCoeff];
             int i;
             for (i = 0; i < trailingOnes; i++)
-                level[i] = 1 - 2 * in.read1Bit();
+                level[i] = 1 - 2 * _in.read1Bit();
 
             for (; i < totalCoeff; i++) {
-                int level_prefix = readZeroBitCount(in, "");
+                int level_prefix = readZeroBitCount(_in, "");
                 int levelSuffixSize = suffixLength;
                 if (level_prefix == 14 && suffixLength == 0)
                     levelSuffixSize = 4;
@@ -225,7 +226,7 @@ public class CAVLC {
 
                 int levelCode = (Min(15, level_prefix) << suffixLength);
                 if (levelSuffixSize > 0) {
-                    int level_suffix = readU(in, levelSuffixSize, "RB: level_suffix");
+                    int level_suffix = readU(_in, levelSuffixSize, "RB: level_suffix");
                     levelCode += level_suffix;
                 }
                 if (level_prefix >= 15 && suffixLength == 0)
@@ -249,11 +250,11 @@ public class CAVLC {
             int zerosLeft;
             if (totalCoeff < nCoeff) {
                 if (coeffLevel.length == 4) {
-                    zerosLeft = H264Const.totalZeros4[totalCoeff - 1].readVLC(in);
+                    zerosLeft = H264Const.totalZeros4[totalCoeff - 1].readVLC(_in);
                 } else if (coeffLevel.length == 8) {
-                    zerosLeft = H264Const.totalZeros8[totalCoeff - 1].readVLC(in);
+                    zerosLeft = H264Const.totalZeros8[totalCoeff - 1].readVLC(_in);
                 } else {
-                    zerosLeft = H264Const.totalZeros16[totalCoeff - 1].readVLC(in);
+                    zerosLeft = H264Const.totalZeros16[totalCoeff - 1].readVLC(_in);
                 }
             } else
                 zerosLeft = 0;
@@ -261,7 +262,7 @@ public class CAVLC {
             int[] runs = new int[totalCoeff];
             int r;
             for (r = 0; r < totalCoeff - 1 && zerosLeft > 0; r++) {
-                int run = H264Const.run[Math.min(6, zerosLeft - 1)].readVLC(in);
+                int run = H264Const.run[Math.min(6, zerosLeft - 1)].readVLC(_in);
                 zerosLeft -= run;
                 runs[r] = run;
             }
@@ -287,10 +288,6 @@ public class CAVLC {
 
     private static int Abs(int i) {
         return i < 0 ? -i : i;
-    }
-
-    public static final int coeffToken(int totalCoeff, int trailingOnes) {
-        return (totalCoeff << 4) | trailingOnes;
     }
 
     public static final int totalCoeff(int coeffToken) {

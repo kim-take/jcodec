@@ -1,12 +1,11 @@
 package org.jcodec.codecs.h264.io.model;
-
 import static org.jcodec.codecs.h264.io.write.CAVLCWriter.writeTrailingBits;
+
+import org.jcodec.common.io.BitWriter;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.jcodec.common.io.BitWriter;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -16,7 +15,7 @@ import org.jcodec.common.io.BitWriter;
  * 
  * capable to serialize and deserialize with CAVLC bitstream
  * 
- * @author Jay Codec
+ * @author The JCodec project
  * 
  */
 public class SEI {
@@ -55,18 +54,18 @@ public class SEI {
 
     private static SEIMessage sei_message(ByteBuffer is) {
         int payloadType = 0;
-        int b;
-        while ((b = is.get() & 0xff) == 0xff) {
+        int b = 0;
+        while (is.hasRemaining() && ( b = (is.get() & 0xff)) == 0xff) {
             payloadType += 255;
         }
-        if (b == -1)
+        if (!is.hasRemaining())
             return null;
         payloadType += b;
         int payloadSize = 0;
-        while ((b = is.get() & 0xff) == 0xff) {
+        while (is.hasRemaining() && (b = (is.get() & 0xff)) == 0xff) {
             payloadSize += 255;
         }
-        if (b == -1)
+        if (!is.hasRemaining())
             return null;
         payloadSize += b;
         byte[] payload = sei_payload(payloadType, payloadSize, is);

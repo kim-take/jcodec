@@ -1,7 +1,9 @@
 package org.jcodec.containers.mxf.model;
+import java.util.Iterator;
+
+import org.jcodec.common.logging.Logger;
 
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -28,7 +30,7 @@ public class IndexSegment extends MXFInterchangeObject {
     private UL instanceUID;
     private int sliceCount;
     private int posTableCount;
-    
+
     public IndexSegment(UL ul) {
         super(ul);
     }
@@ -37,12 +39,12 @@ public class IndexSegment extends MXFInterchangeObject {
     protected void read(Map<Integer, ByteBuffer> tags) {
         for (Iterator<Entry<Integer, ByteBuffer>> it = tags.entrySet().iterator(); it.hasNext();) {
             Entry<Integer, ByteBuffer> entry = it.next();
-            
+
             ByteBuffer _bb = entry.getValue();
 
             switch (entry.getKey()) {
             case 0x3c0a:
-                instanceUID = UL.read(_bb); 
+                instanceUID = UL.read(_bb);
                 break;
             case 0x3f05:
                 editUnitByteCount = _bb.getInt();
@@ -76,7 +78,7 @@ public class IndexSegment extends MXFInterchangeObject {
                 posTableCount = _bb.get() & 0xff;
                 break;
             default:
-                System.out.println(String.format("Unknown tag [IndexSegment: " + ul + "]: %04x", entry.getKey()));
+                Logger.warn(String.format("Unknown tag [" + ul + "]: %04x", entry.getKey()));
                 continue;
             }
             it.remove();

@@ -1,11 +1,8 @@
 package org.jcodec.containers.mp4.boxes;
 
-import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Map;
+import org.jcodec.common.io.NIOUtils;
 
-import org.jcodec.common.NIOUtils;
-import org.jcodec.common.tools.ToJSON;
+import java.nio.ByteBuffer;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -18,12 +15,25 @@ import org.jcodec.common.tools.ToJSON;
  */
 public class TimecodeSampleEntry extends SampleEntry {
 
+    private static final String TMCD = "tmcd";
+
+    //@formatter:off
     public static final int FLAG_DROPFRAME = 0x1;
     public static final int FLAG_24HOURMAX = 0x2;
     public static final int FLAG_NEGATIVETIMEOK = 0x4;
     public static final int FLAG_COUNTER = 0x8;
+    //@formatter:on
 
-    private static final MyFactory FACTORY = new MyFactory();
+    public static TimecodeSampleEntry createTimecodeSampleEntry(int flags, int timescale, int frameDuration,
+            int numFrames) {
+        TimecodeSampleEntry tmcd = new TimecodeSampleEntry(new Header(TMCD));
+        tmcd.flags = flags;
+        tmcd.timescale = timescale;
+        tmcd.frameDuration = frameDuration;
+        tmcd.numFrames = (byte) numFrames;
+        return tmcd;
+    }
+
     private int flags;
     private int timescale;
     private int frameDuration;
@@ -31,20 +41,6 @@ public class TimecodeSampleEntry extends SampleEntry {
 
     public TimecodeSampleEntry(Header header) {
         super(header);
-        factory = FACTORY;
-    }
-
-    public TimecodeSampleEntry() {
-        super(new Header("tmcd"));
-        factory = FACTORY;
-    }
-
-    public TimecodeSampleEntry(int flags, int timescale, int frameDuration, int numFrames) {
-        super(new Header("tmcd"));
-        this.flags = flags;
-        this.timescale = timescale;
-        this.frameDuration = frameDuration;
-        this.numFrames = (byte) numFrames;
     }
 
     public void parse(ByteBuffer input) {
@@ -68,17 +64,6 @@ public class TimecodeSampleEntry extends SampleEntry {
         out.put((byte) 207);
     }
 
-    public static class MyFactory extends BoxFactory {
-        private Map<String, Class<? extends Box>> mappings = new HashMap<String, Class<? extends Box>>();
-
-        public MyFactory() {
-        }
-
-        public Class<? extends Box> toClass(String fourcc) {
-            return mappings.get(fourcc);
-        }
-    }
-
     public int getFlags() {
         return flags;
     }
@@ -97,17 +82,5 @@ public class TimecodeSampleEntry extends SampleEntry {
 
     public boolean isDropFrame() {
         return (flags & FLAG_DROPFRAME) != 0;
-    }
-
-    @Override
-    public void dump(StringBuilder sb) {
-        sb.append(header.getFourcc() + ": {\n");
-        sb.append("entry: ");
-
-        ToJSON.toJSON(this, sb, "flags", "timescale", "frameDuration", "numFrames");
-        sb.append(",\nexts: [\n");
-        dumpBoxes(sb);
-        sb.append("\n]\n");
-        sb.append("}\n");
     }
 }

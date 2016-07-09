@@ -1,7 +1,9 @@
 package org.jcodec.containers.mxf.model;
+import java.util.Iterator;
+
+import org.jcodec.common.logging.Logger;
 
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -34,7 +36,7 @@ public class GenericDataEssenceDescriptor extends FileDescriptor {
                 dataEssenceCoding = UL.read(_bb);
                 break;
             default:
-                System.out.println(String.format("Unknown tag [ FileDescriptor: " + ul + "]: %04x", entry.getKey()));
+                Logger.warn(String.format("Unknown tag [ FileDescriptor: " + ul + "]: %04x", entry.getKey()));
                 continue;
             }
             it.remove();

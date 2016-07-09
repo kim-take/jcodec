@@ -1,6 +1,8 @@
 package org.jcodec.common.model;
-
+import static java.lang.System.arraycopy;
 import static org.jcodec.common.model.ColorSpace.MAX_PLANES;
+
+import java.lang.IllegalArgumentException;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -9,6 +11,7 @@ import static org.jcodec.common.model.ColorSpace.MAX_PLANES;
  * A YUV picture
  * 
  * @author The JCodec project
+ * @deprecated Use org.jcodec.common.model.Picture8Bit and related APIs
  * 
  */
 public class Picture {
@@ -21,27 +24,46 @@ public class Picture {
 
     private Rect crop;
 
-    public Picture(int width, int height, int[][] data, ColorSpace color) {
-        this(width, height, data, color, new Rect(0, 0, width, height));
+    private int bitDepth;
+
+    public static Picture createPicture(int width, int height, int[][] data, ColorSpace color) {
+        return new Picture(width, height, data, color, 8, new Rect(0, 0, width, height));
     }
 
-    public Picture(int width, int height, int[][] data, ColorSpace color, Rect crop) {
+    public static Picture createPictureWithDepth(int width, int height, int[][] data, ColorSpace color, int bitDepth) {
+        return new Picture(width, height, data, color, bitDepth, new Rect(0, 0, width, height));
+    }
+
+    public static Picture createPictureCropped(int width, int height, int[][] data, ColorSpace color, Rect crop) {
+        return new Picture(width, height, data, color, 8, crop);
+    }
+
+    public Picture(int width, int height, int[][] data, ColorSpace color, int bitDepth, Rect crop) {
         this.width = width;
         this.height = height;
         this.data = data;
         this.color = color;
         this.crop = crop;
+        this.bitDepth = bitDepth;
     }
 
-    public Picture(Picture other) {
-        this(other.width, other.height, other.data, other.color, other.crop);
+    public static Picture clonePicture(Picture other) {
+        return new Picture(other.width, other.height, other.data, other.color, other.bitDepth, other.crop);
     }
-
+    
     public static Picture create(int width, int height, ColorSpace colorSpace) {
-        return create(width, height, colorSpace, null);
+        return doCreate(width, height, colorSpace, 8, null);
     }
 
-    public static Picture create(int width, int height, ColorSpace colorSpace, Rect crop) {
+    public static Picture createWithDepth(int width, int height, ColorSpace colorSpace, int bitDepth) {
+        return doCreate(width, height, colorSpace, bitDepth, null);
+    }
+
+    public static Picture createCropped(int width, int height, ColorSpace colorSpace, Rect crop) {
+        return doCreate(width, height, colorSpace, 8, crop);
+    }
+
+    public static Picture doCreate(int width, int height, ColorSpace colorSpace, int bitDepth, Rect crop) {
         int[] planeSizes = new int[MAX_PLANES];
         for (int i = 0; i < colorSpace.nComp; i++) {
             planeSizes[colorSpace.compPlane[i]] += (width >> colorSpace.compWidth[i])
@@ -58,8 +80,9 @@ public class Picture {
             }
         }
 
-        return new Picture(width, height, data, colorSpace, crop);
+        return new Picture(width, height, data, colorSpace, 8, crop);
     }
+
 
     public int getWidth() {
         return width;
@@ -81,6 +104,10 @@ public class Picture {
         return data;
     }
 
+    public int getBitDepth() {
+        return bitDepth;
+    }
+
     public Rect getCrop() {
         return crop;
     }
@@ -94,7 +121,7 @@ public class Picture {
     }
 
     public boolean compatible(Picture src) {
-        return src.color == color && src.width == width && src.height == height;
+        return src.color == color && src.width == width && src.height == height && src.bitDepth == bitDepth;
     }
 
     public Picture createCompatible() {
@@ -107,8 +134,8 @@ public class Picture {
         for (int plane = 0; plane < color.nComp; plane++) {
             if (data[plane] == null)
                 continue;
-            System.arraycopy(src.data[plane], 0, data[plane], 0, (width >> color.compWidth[plane])
-                    * (height >> color.compHeight[plane]));
+            arraycopy(src.data[plane], 0, data[plane], 0,
+                    (width >> color.compWidth[plane]) * (height >> color.compHeight[plane]));
         }
     }
 
@@ -116,7 +143,7 @@ public class Picture {
         if (crop == null
                 || (crop.getX() == 0 && crop.getY() == 0 && crop.getWidth() == width && crop.getHeight() == height))
             return this;
-        Picture result = Picture.create(crop.getWidth(), crop.getHeight(), color);
+        Picture result = Picture.createWithDepth(crop.getWidth(), crop.getHeight(), color, bitDepth);
 
         for (int plane = 0; plane < color.nComp; plane++) {
             if (data[plane] == null)
@@ -143,12 +170,49 @@ public class Picture {
     public void setCrop(Rect crop) {
         this.crop = crop;
     }
-    
+
     public int getCroppedWidth() {
         return crop == null ? width : crop.getWidth();
     }
-    
+
     public int getCroppedHeight() {
         return crop == null ? height : crop.getHeight();
+    }
+
+    public void setBitDepth(int bitDepth) {
+        this.bitDepth = bitDepth;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null || !(obj instanceof Picture))
+            return false;
+        Picture other = (Picture) obj;
+
+        if (other.getCroppedWidth() != getCroppedWidth() || other.getCroppedHeight() != getCroppedHeight()
+                || other.getColor() != color)
+            return false;
+
+        for (int i = 0; i < getData().length; i++)
+            if (!planeEquals(other, i))
+                return false;
+        return true;
+    }
+
+    private boolean planeEquals(Picture other, int plane) {
+        int cw = color.compWidth[plane];
+        int ch = color.compHeight[plane];
+        int offA = other.getCrop() == null ? 0
+                : ((other.getCrop().getX() >> cw) + (other.getCrop().getY() >> ch) * (other.getWidth() >> cw));
+        int offB = crop == null ? 0 : ((crop.getX() >> cw) + (crop.getY() >> ch) * (width >> cw));
+
+        int[] planeData = other.getPlaneData(plane);
+        for (int i = 0; i < getCroppedHeight() >> ch; i++, offA += (other.getWidth() >> cw), offB += (width >> cw)) {
+            for (int j = 0; j < getCroppedWidth() >> cw; j++) {
+                if (planeData[offA + j] != data[plane][offB + j])
+                    return false;
+            }
+        }
+        return true;
     }
 }

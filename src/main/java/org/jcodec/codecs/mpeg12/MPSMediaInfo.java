@@ -1,6 +1,17 @@
 package org.jcodec.codecs.mpeg12;
+import static org.jcodec.common.io.NIOUtils.cloneBuffer;
 
-import static org.jcodec.common.NIOUtils.cloneBuffer;
+import org.jcodec.common.AudioFormat;
+import org.jcodec.common.Codec;
+import org.jcodec.common.IntArrayList;
+import org.jcodec.common.io.NIOUtils;
+import org.jcodec.common.io.SeekableByteChannel;
+import org.jcodec.common.logging.Logger;
+import org.jcodec.common.model.ChannelLabel;
+import org.jcodec.common.model.Rational;
+import org.jcodec.common.model.Size;
+import org.jcodec.containers.mps.MPSUtils;
+import org.jcodec.containers.mps.MPSUtils.PESReader;
 
 import java.io.File;
 import java.io.IOException;
@@ -10,17 +21,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.jcodec.common.AudioFormat;
-import org.jcodec.common.Codec;
-import org.jcodec.common.IntArrayList;
-import org.jcodec.common.NIOUtils;
-import org.jcodec.common.SeekableByteChannel;
-import org.jcodec.common.model.ChannelLabel;
-import org.jcodec.common.model.Rational;
-import org.jcodec.common.model.Size;
-import org.jcodec.containers.mps.MPSUtils;
-import org.jcodec.containers.mps.MPSUtils.PESReader;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -33,11 +33,15 @@ import org.jcodec.containers.mps.MPSUtils.PESReader;
  */
 public class MPSMediaInfo extends PESReader {
 
-    private Map<Integer, MPEGTrackMetadata> infos = new HashMap<Integer, MPSMediaInfo.MPEGTrackMetadata>();
+    private Map<Integer, MPEGTrackMetadata> infos;
     private int pesTried;
     private PSM psm;
+    
+    public MPSMediaInfo() {
+        this.infos = new HashMap<Integer, MPSMediaInfo.MPEGTrackMetadata>();
+    }
 
-    public class MPEGTimecodeMetadata {
+    public static class MPEGTimecodeMetadata {
 
         public String getNumFrames() {
             // TODO Auto-generated method stub
@@ -53,9 +57,10 @@ public class MPSMediaInfo extends PESReader {
             // TODO Auto-generated method stub
             return null;
         }
-        
+
     }
-    public class MPEGTrackMetadata {
+
+    public static class MPEGTrackMetadata {
         int streamId;
         Codec codec;
         ByteBuffer probeData;
@@ -120,14 +125,19 @@ public class MPSMediaInfo extends PESReader {
                 protected void data(ByteBuffer data, long filePos) {
                     analyseBuffer(data, filePos);
                 }
+
+                @Override
+                protected void done() {
+                    
+                }
             }.readFile(f, 0x10000, null);
         } catch (MediaInfoDone e) {
-            System.out.println("MEDIA INFO DONE");
+            Logger.info("Media info done");
         }
         return getInfos();
     }
 
-    public class MediaInfoDone extends RuntimeException {
+    public static class MediaInfoDone extends RuntimeException {
     };
 
     @Override
@@ -179,7 +189,7 @@ public class MPSMediaInfo extends PESReader {
 
     private int[] parseSystem(ByteBuffer pesBuffer) {
         NIOUtils.skip(pesBuffer, 12);
-        IntArrayList result = new IntArrayList();
+        IntArrayList result = IntArrayList.createIntArrayList();
         while (pesBuffer.remaining() >= 3 && (pesBuffer.get(pesBuffer.position()) & 0x80) == 0x80) {
             result.add(pesBuffer.get() & 0xff);
             pesBuffer.getShort();
@@ -222,7 +232,7 @@ public class MPSMediaInfo extends PESReader {
         return new ArrayList<MPEGTrackMetadata>(infos.values());
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main1(String[] args) throws IOException {
         new MPSMediaInfo().getMediaInfo(new File(args[0]));
     }
 

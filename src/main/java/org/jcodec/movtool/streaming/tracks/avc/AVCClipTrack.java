@@ -1,35 +1,32 @@
 package org.jcodec.movtool.streaming.tracks.avc;
+import java.lang.IllegalStateException;
+import java.lang.System;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
 
 import org.jcodec.codecs.h264.H264Decoder;
 import org.jcodec.codecs.h264.H264Encoder;
 import org.jcodec.codecs.h264.H264Utils;
 import org.jcodec.codecs.h264.H264Utils.SliceHeaderTweaker;
-import org.jcodec.codecs.h264.encode.ConstantRateControl;
-import org.jcodec.codecs.h264.io.model.Frame;
+import org.jcodec.codecs.h264.encode.H264FixedRateControl;
 import org.jcodec.codecs.h264.io.model.NALUnit;
 import org.jcodec.codecs.h264.io.model.NALUnitType;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.io.model.SliceHeader;
-import org.jcodec.codecs.h264.mp4.AvcCBox;
-import org.jcodec.common.NIOUtils;
+import org.jcodec.common.io.NIOUtils;
 import org.jcodec.common.model.ColorSpace;
-import org.jcodec.common.model.Picture;
-import org.jcodec.containers.mp4.MP4Util;
-import org.jcodec.containers.mp4.boxes.SampleDescriptionBox;
-import org.jcodec.containers.mp4.boxes.SampleEntry;
-import org.jcodec.containers.mp4.boxes.VideoSampleEntry;
+import org.jcodec.common.model.Picture8Bit;
+import org.jcodec.movtool.streaming.CodecMeta;
+import org.jcodec.movtool.streaming.VideoCodecMeta;
 import org.jcodec.movtool.streaming.VirtualPacket;
 import org.jcodec.movtool.streaming.VirtualTrack;
 import org.jcodec.movtool.streaming.tracks.ClipTrack;
 import org.jcodec.movtool.streaming.tracks.VirtualPacketWrapper;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -42,29 +39,33 @@ import org.jcodec.movtool.streaming.tracks.VirtualPacketWrapper;
  */
 public class AVCClipTrack extends ClipTrack {
 
-    private AvcCBox avcC;
-    private ConstantRateControl rc;
+    // private AvcCBox avcC;
+    private H264FixedRateControl rc;
     private int mbW;
     private int mbH;
-    private VideoSampleEntry se;
-    private int frameSize;
+    private VideoCodecMeta se;
+    private final int frameSize;
     private SeqParameterSet encSPS;
     private PictureParameterSet encPPS;
+    private byte[] codecPrivate;
 
     public AVCClipTrack(VirtualTrack src, int frameFrom, int frameTo) {
         super(src, frameFrom, frameTo);
 
-        SampleEntry origSE = src.getSampleEntry();
-        if (!"avc1".equals(origSE.getFourcc()))
+        VideoCodecMeta codecMeta = (VideoCodecMeta) src.getCodecMeta();
+        if (!"avc1".equals(codecMeta.getFourcc()))
             throw new RuntimeException("Not an AVC source track");
 
-        rc = new ConstantRateControl(1024);
-        H264Encoder encoder = new H264Encoder(rc);
-        avcC = H264Utils.parseAVCC((VideoSampleEntry) origSE);
-        SeqParameterSet sps = H264Utils.readSPS(NIOUtils.duplicate(avcC.getSpsList().get(0)));
+        rc = new H264FixedRateControl(1024);
+        H264Encoder encoder = getEncoder();
+        ByteBuffer codecPrivate = codecMeta.getCodecPrivate();
+        this.codecPrivate = NIOUtils.toArray(codecPrivate);
+        List<ByteBuffer> rawSPS = H264Utils.getRawSPS(codecPrivate);
+        List<ByteBuffer> rawPPS = H264Utils.getRawPPS(codecPrivate);
+        SeqParameterSet sps = H264Utils.readSPS(rawSPS.get(0));
 
         mbW = sps.pic_width_in_mbs_minus1 + 1;
-        mbH = H264Utils.getPicHeightInMbs(sps);
+        mbH = SeqParameterSet.getPicHeightInMbs(sps);
 
         encSPS = encoder.initSPS(H264Utils.getPicSize(sps));
         encSPS.seq_parameter_set_id = 1;
@@ -80,17 +81,23 @@ public class AVCClipTrack extends ClipTrack {
         encSPS.frame_crop_top_offset = sps.frame_crop_top_offset;
         encSPS.vuiParams = sps.vuiParams;
 
-        avcC.getSpsList().add(H264Utils.writeSPS(encSPS, 128));
-        avcC.getPpsList().add(H264Utils.writePPS(encPPS, 20));
+        rawSPS.add(H264Utils.writeSPS(encSPS, 128));
+        rawPPS.add(H264Utils.writePPS(encPPS, 20));
 
-        se = (VideoSampleEntry) MP4Util.cloneBox(origSE, 2048, SampleDescriptionBox.FACTORY);
-        se.removeChildren("avcC");
-        se.add(avcC);
+        se = VideoCodecMeta.createVideoCodecMeta("avc1", ByteBuffer.wrap(H264Utils.saveCodecPrivate(rawSPS, rawPPS)), codecMeta.getSize(), codecMeta.getPasp());
 
-        frameSize = rc.calcFrameSize(mbW * mbH);
-        frameSize += frameSize >> 4;
+        int _frameSize = rc.calcFrameSize(mbW * mbH);
+        _frameSize += _frameSize >> 4;
+        this.frameSize = _frameSize;
     }
 
+    private H264Encoder getEncoder() {
+        H264Encoder encoder = new H264Encoder(rc);
+        encoder.setKeyInterval(1);
+        return encoder;
+    }
+
+    @Override
     protected List<VirtualPacket> getGop(VirtualTrack src, int from) throws IOException {
         VirtualPacket packet = src.nextPacket();
 
@@ -106,48 +113,50 @@ public class AVCClipTrack extends ClipTrack {
             tail.add(packet);
             packet = src.nextPacket();
         }
-        
+
         List<VirtualPacket> gop = new ArrayList<VirtualPacket>();
-        GopTranscoder tr = new GopTranscoder(head, tail);
-        
+        GopTranscoder tr = new GopTranscoder(this, head, tail, getEncoder());
+
         for (int i = 0; i < tail.size(); i++)
-            gop.add(new TranscodePacket(tail.get(i), tr, i));
+            gop.add(new TranscodePacket(tail.get(i), tr, i, frameSize));
 
         gop.add(packet);
 
         return gop;
     }
 
-    public class GopTranscoder {
+    public static class GopTranscoder {
 
         private List<VirtualPacket> tail;
         private List<VirtualPacket> head;
         private List<ByteBuffer> result;
+        private AVCClipTrack track;
+        private H264Encoder encoder;
 
-        public GopTranscoder(List<VirtualPacket> head, List<VirtualPacket> tail) {
+        public GopTranscoder(AVCClipTrack track, List<VirtualPacket> head, List<VirtualPacket> tail,
+                H264Encoder encoder) {
+            this.track = track;
             this.head = head;
             this.tail = tail;
+            this.encoder = encoder;
         }
 
         public List<ByteBuffer> transcode() throws IOException {
-            H264Decoder decoder = new H264Decoder();
-            decoder.addSps(avcC.getSpsList());
-            decoder.addPps(avcC.getPpsList());
-            Picture buf = Picture.create(mbW << 4, mbH << 4, ColorSpace.YUV420);
-            Frame dec = null;
+            H264Decoder decoder = H264Decoder.createH264DecoderFromCodecPrivate(track.codecPrivate);
+            Picture8Bit buf = Picture8Bit.create(track.mbW << 4, track.mbH << 4, ColorSpace.YUV420J);
+            Picture8Bit dec = null;
             for (VirtualPacket virtualPacket : head) {
-                dec = decoder.decodeFrame(H264Utils.splitMOVPacket(virtualPacket.getData(), avcC), buf.getData());
+                dec = decoder.decodeFrame8Bit(virtualPacket.getData(), buf.getData());
             }
-            H264Encoder encoder = new H264Encoder(rc);
-            ByteBuffer tmp = ByteBuffer.allocate(frameSize);
+            ByteBuffer tmp = ByteBuffer.allocate(track.frameSize);
 
             List<ByteBuffer> result = new ArrayList<ByteBuffer>();
             for (VirtualPacket pkt : tail) {
-                dec = decoder.decodeFrame(H264Utils.splitMOVPacket(pkt.getData(), avcC), buf.getData());
+                dec = decoder.decodeFrame8Bit(pkt.getData(), buf.getData());
 
                 tmp.clear();
-                ByteBuffer res = encoder.encodeFrame(dec, tmp);
-                ByteBuffer out = ByteBuffer.allocate(frameSize);
+                ByteBuffer res = encoder.encodeFrame8Bit(dec, tmp);
+                ByteBuffer out = ByteBuffer.allocate(track.frameSize);
                 processFrame(res, out);
 
                 result.add(out);
@@ -156,7 +165,7 @@ public class AVCClipTrack extends ClipTrack {
             return result;
         }
 
-        private void processFrame(ByteBuffer in, ByteBuffer out) {
+        private void processFrame(ByteBuffer _in, ByteBuffer out) {
             SliceHeaderTweaker st = new H264Utils.SliceHeaderTweaker() {
                 @Override
                 protected void tweak(SliceHeader sh) {
@@ -164,24 +173,22 @@ public class AVCClipTrack extends ClipTrack {
                 }
             };
 
-            ByteBuffer dup = in.duplicate();
+            ByteBuffer dup = _in.duplicate();
             while (dup.hasRemaining()) {
                 ByteBuffer buf = H264Utils.nextNALUnit(dup);
                 if (buf == null)
                     break;
 
                 NALUnit nu = NALUnit.read(buf);
-                if (nu.type == NALUnitType.IDR_SLICE) {
-                    ByteBuffer sp = out.duplicate();
-                    out.putInt(0);
+                if (nu.type == NALUnitType.IDR_SLICE || nu.type == NALUnitType.NON_IDR_SLICE) {
+                    out.putInt(1);
                     nu.write(out);
-                    st.run(buf, out, nu, encSPS, encPPS);
-                    sp.putInt(out.position() - sp.position() - 4);
+                    st.runSpsPps(buf, out, nu, track.encSPS, track.encPPS);
                 }
             }
 
             if (out.remaining() >= 5) {
-                out.putInt(out.remaining() - 4);
+                out.putInt(1);
                 new NALUnit(NALUnitType.FILLER_DATA, 0).write(out);
             }
             out.clear();
@@ -196,20 +203,22 @@ public class AVCClipTrack extends ClipTrack {
     }
 
     @Override
-    public SampleEntry getSampleEntry() {
+    public CodecMeta getCodecMeta() {
         return se;
     }
 
-    public class TranscodePacket extends VirtualPacketWrapper {
+    public static class TranscodePacket extends VirtualPacketWrapper {
 
         private GopTranscoder tr;
         private int off;
+        private int frameSize;
 
-        public TranscodePacket(VirtualPacket src, GopTranscoder tr, int off) {
+        public TranscodePacket(VirtualPacket src, GopTranscoder tr, int off, int frameSize) {
             super(src);
 
             this.tr = tr;
             this.off = off;
+            this.frameSize = frameSize;
         }
 
         @Override

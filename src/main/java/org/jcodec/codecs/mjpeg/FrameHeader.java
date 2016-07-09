@@ -1,5 +1,4 @@
 package org.jcodec.codecs.mjpeg;
-
 import java.nio.ByteBuffer;
 
 /**
@@ -10,6 +9,8 @@ import java.nio.ByteBuffer;
  * components in the frame, and the sampling factors for each component, and
  * specifies the destinations from which the quantized tables to be used with
  * each component are retrieved.
+ * 
+ * @author The JCodec project
  */
 public class FrameHeader {
     /**
@@ -89,7 +90,8 @@ public class FrameHeader {
 
     public int getHmax() {
         int max = 0;
-        for (Component c : components) {
+        for (int i = 0; i < components.length; i++) {
+            Component c = components[i];
             max = Math.max(max, c.subH);
         }
         return max;
@@ -97,7 +99,8 @@ public class FrameHeader {
 
     public int getVmax() {
         int max = 0;
-        for (Component c : components) {
+        for (int i = 0; i < components.length; i++) {
+            Component c = components[i];
             max = Math.max(max, c.subV);
         }
         return max;

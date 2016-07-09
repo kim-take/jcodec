@@ -1,5 +1,4 @@
 package org.jcodec.codecs.common.biari;
-
 import java.io.IOException;
 import java.io.OutputStream;
 
@@ -11,7 +10,7 @@ import java.io.OutputStream;
  * 
  * Half-way to MQ Coder
  * 
- * @author Jay Codec
+ * @author The JCodec project
  * 
  */
 public class MQEncoder {

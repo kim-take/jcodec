@@ -1,11 +1,18 @@
 package org.jcodec.codecs.vp8;
-
 import static java.lang.Math.abs;
 import static org.jcodec.codecs.vp8.FilterUtil.Segment.horizontal;
 import static org.jcodec.codecs.vp8.FilterUtil.Segment.vertical;
 
+import org.jcodec.api.NotImplementedException;
 import org.jcodec.codecs.vp8.Macroblock.Subblock;
 
+/**
+ * This class is part of JCodec ( www.jcodec.org ) This software is distributed
+ * under FreeBSD License
+ * 
+ * @author The JCodec project
+ * 
+ */
 public class FilterUtil {
 
     /**
@@ -266,7 +273,7 @@ public class FilterUtil {
                                 else if (loop_filter_level >= 15)
                                     hev_threshold = 1;
                             } else /* current frame is an interframe */ {
-                                throw new UnsupportedOperationException("TODO: non-key frames are not supported yet.");
+                                throw new NotImplementedException("TODO: non-key frames are not supported yet.");
 //                                if (loop_filter_level >= 40)
 //                                    hev_threshold = 3;
 //                                else if (loop_filter_level >= 20)
@@ -387,7 +394,7 @@ public class FilterUtil {
                                 else if (loopFilterLevel >= 15)
                                     varianceThreshold = 1;
                             } else /* current frame is an interframe */ {
-                                throw new UnsupportedOperationException("TODO: non-key frames are not supported yet");
+                                throw new NotImplementedException("TODO: non-key frames are not supported yet");
 //                                if (loopFilterLevel >= 40)
 //                                    varianceThreshold = 3;
 //                                else if (loop_filter_level >= 20)

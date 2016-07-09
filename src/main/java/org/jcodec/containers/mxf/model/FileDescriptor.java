@@ -1,11 +1,12 @@
 package org.jcodec.containers.mxf.model;
+import java.util.Iterator;
+
+import org.jcodec.common.logging.Logger;
+import org.jcodec.common.model.Rational;
 
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
-
-import org.jcodec.common.model.Rational;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -52,7 +53,7 @@ public class FileDescriptor extends GenericDescriptor {
                 codec = UL.read(_bb);
                 break;
             default:
-//                System.out.println(String.format("Unknown tag [ FileDescriptor: " + ul + "]: %04x", entry.getKey()));
+                Logger.warn(String.format("Unknown tag [ " + ul + "]: %04x", entry.getKey()));
                 continue;
             }
             it.remove();

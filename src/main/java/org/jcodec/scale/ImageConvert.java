@@ -1,12 +1,11 @@
 package org.jcodec.scale;
-
 import java.nio.ByteBuffer;
 
 /**
  * This class is part of JCodec ( www.jcodec.org )
  * This software is distributed under FreeBSD License
  * 
- * @author Jay Codec
+ * @author The JCodec project
  *
  */
 public class ImageConvert {
@@ -51,8 +50,8 @@ public class ImageConvert {
 
     private final static byte[] cropTable = new byte[CROP + 256 + CROP];
     private final static int[] intCropTable = new int[CROP + 256 + CROP];
-    private final static byte[] y_ccir_to_jpeg = new byte[256];
-    private final static byte[] y_jpeg_to_ccir = new byte[256];
+    private final static byte[] _y_ccir_to_jpeg = new byte[256];
+    private final static byte[] _y_jpeg_to_ccir = new byte[256];
 
     static {
         for (int i = -CROP; i < 0; i++) {
@@ -68,8 +67,8 @@ public class ImageConvert {
             intCropTable[i + CROP] = 255;
         }
         for (int i = 0; i < 256; i++) {
-            y_ccir_to_jpeg[i] = crop(Y_CCIR_TO_JPEG(i));
-            y_jpeg_to_ccir[i] = crop(Y_JPEG_TO_CCIR(i));
+            _y_ccir_to_jpeg[i] = crop(Y_CCIR_TO_JPEG(i));
+            _y_jpeg_to_ccir[i] = crop(Y_JPEG_TO_CCIR(i));
         }
     }
 
@@ -82,11 +81,11 @@ public class ImageConvert {
     }
 
     public final static byte y_ccir_to_jpeg(final byte y) {
-        return y_ccir_to_jpeg[(y & 0xff)];
+        return _y_ccir_to_jpeg[(y & 0xff)];
     }
 
     public final static byte y_jpeg_to_ccir(final byte y) {
-        return y_jpeg_to_ccir[(y & 0xff)];
+        return _y_jpeg_to_ccir[(y & 0xff)];
     }
 
     public static void YUV444toRGB888(final int y, final int u, final int v,

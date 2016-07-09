@@ -1,9 +1,7 @@
 package org.jcodec.codecs.h264.io.write;
-
-import static org.jcodec.common.tools.Debug.print;
-import static org.jcodec.common.tools.Debug.println;
 import static org.jcodec.common.tools.Debug.trace;
 
+import org.jcodec.api.NotImplementedException;
 import org.jcodec.common.io.BitWriter;
 import org.jcodec.common.tools.MathUtil;
 
@@ -13,7 +11,7 @@ import org.jcodec.common.tools.MathUtil;
  * 
  * A class responsible for outputting exp-Golomb values into binary stream
  * 
- * @author Jay Codec
+ * @author The JCodec project
  * 
  */
 public class CAVLCWriter {
@@ -21,7 +19,7 @@ public class CAVLCWriter {
     private CAVLCWriter() {
     }
 
-    public static void writeU(BitWriter out, int value, int n, String message)  {
+    public static void writeUtrace(BitWriter out, int value, int n, String message)  {
         out.writeNBit(value, n);
         trace(message, value);
     }
@@ -45,14 +43,21 @@ public class CAVLCWriter {
         writeUE(out, MathUtil.golomb(value));
     }
 
-    public static void writeUE(BitWriter out, int value, String message)  {
+    public static void writeUEtrace(BitWriter out, int value, String message)  {
         writeUE(out, value);
         trace(message, value);
     }
 
-    public static void writeSE(BitWriter out, int value, String message)  {
+    public static void writeSEtrace(BitWriter out, int value, String message)  {
         writeUE(out, MathUtil.golomb(value));
         trace(message, value);
+    }
+    
+    public static void writeTE(BitWriter out, int value, int max) {
+        if (max > 1)
+            writeUE(out, value);
+        else
+            out.write1Bit(~value & 0x1);
     }
 
     public static void writeBool(BitWriter out, boolean value, String message)  {
@@ -77,6 +82,6 @@ public class CAVLCWriter {
     }
 
     public static void writeSliceTrailingBits() {
-        throw new IllegalStateException("todo");
+        throw new NotImplementedException("todo");
     }
 }

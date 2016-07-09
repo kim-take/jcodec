@@ -1,14 +1,15 @@
 package org.jcodec.containers.mp4.boxes;
 
+import org.jcodec.common.JCodecUtil2;
+import org.jcodec.common.io.NIOUtils;
+import org.jcodec.common.io.SeekableByteChannel;
+import org.jcodec.common.io.StringReader;
+import org.jcodec.common.logging.Logger;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-
-import org.jcodec.codecs.wav.StringReader;
-import org.jcodec.common.NIOUtils;
-import org.jcodec.common.JCodecUtil;
-import org.jcodec.common.SeekableByteChannel;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -16,7 +17,7 @@ import org.jcodec.common.SeekableByteChannel;
  * 
  * An MP4 file structure (atom)
  * 
- * @author Jay Codec
+ * @author The JCodec project
  * 
  */
 public class Header {
@@ -30,27 +31,25 @@ public class Header {
         this.fourcc = fourcc;
     }
 
-    public Header(String fourcc, long size) {
-        this.size = size;
-        this.fourcc = fourcc;
+    public static Header createHeader(String fourcc, long size) {
+        Header header = new Header(fourcc);
+        header.size = size;
+        return header;
     }
-
-    public Header(Header h) {
-        this.fourcc = h.fourcc;
-        this.size = h.size;
+    
+    public static Header newHeader(String fourcc, long size, boolean lng) {
+        Header header = new Header(fourcc);
+        header.size = size;
+        header.lng = lng;
+        return header;
     }
-
-    public Header(String fourcc, long size, boolean lng) {
-        this(fourcc, size);
-        this.lng = lng;
-    }
-
+    
     public static Header read(ByteBuffer input) {
         long size = 0;
         while (input.remaining() >= 4 && (size = (((long) input.getInt()) & 0xffffffffL)) == 0)
             ;
         if (input.remaining() < 4 || size < 8 && size != 1) {
-            System.out.println("Broken atom of size " + size);
+            Logger.error("Broken atom of size " + size);
             return null;
         }
 
@@ -61,17 +60,14 @@ public class Header {
                 lng = true;
                 size = input.getLong();
             } else {
-                System.out.println("Broken atom of size " + size);
+                Logger.error("Broken atom of size " + size);
                 return null;
             }
         }
 
-        return new Header(fourcc, size, lng);
+        return newHeader(fourcc, size, lng);
     }
 
-    public void print() {
-        System.out.println(fourcc + "," + size);
-    }
 
     public void skip(InputStream di) throws IOException {
         StringReader.sureSkip(di, size - headerSize());
@@ -106,13 +102,13 @@ public class Header {
             out.putInt(1);
         else
             out.putInt((int) size);
-        out.put(JCodecUtil.asciiString(fourcc));
+        out.put(JCodecUtil2.asciiString(fourcc));
         if (size > MAX_UNSIGNED_INT) {
             out.putLong(size);
         }
     }
     
-    public void write(SeekableByteChannel output) throws IOException {
+    public void writeChannel(SeekableByteChannel output) throws IOException {
         ByteBuffer bb = ByteBuffer.allocate(16);
         write(bb);
         bb.flip();
@@ -121,5 +117,30 @@ public class Header {
 
     public long getSize() {
         return size;
+    }
+
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((fourcc == null) ? 0 : fourcc.hashCode());
+        return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        Header other = (Header) obj;
+        if (fourcc == null) {
+            if (other.fourcc != null)
+                return false;
+        } else if (!fourcc.equals(other.fourcc))
+            return false;
+        return true;
     }
 }

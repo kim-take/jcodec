@@ -1,7 +1,9 @@
 package org.jcodec.containers.mxf.model;
+import java.util.Iterator;
+
+import org.jcodec.common.logging.Logger;
 
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -69,7 +71,7 @@ public class CDCIEssenceDescriptor extends GenericPictureEssenceDescriptor {
                 colorRange = _bb.getInt();
                 break;
             default:
-//                System.out.println(String.format("Unknown tag [ CDCIEssenceDescriptor: " + ul + "]: %04x", entry.getKey()));
+                Logger.warn(String.format("Unknown tag [ " + ul + "]: %04x", entry.getKey()));
                 continue;
             }
             it.remove();

@@ -5,18 +5,20 @@ import static org.jcodec.containers.mp4.TimeUtil.toMovTime;
 
 import java.nio.ByteBuffer;
 
-import org.jcodec.common.tools.ToJSON;
-
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
  * under FreeBSD License
  * 
  * A media header atom
  * 
- * @author Jay Codec
+ * @author The JCodec project
  * 
  */
 public class MediaHeaderBox extends FullBox {
+    public MediaHeaderBox(Header atom) {
+        super(atom);
+    }
+
     private long created;
     private long modified;
     private int timescale;
@@ -28,18 +30,48 @@ public class MediaHeaderBox extends FullBox {
         return "mdhd";
     }
 
-    public MediaHeaderBox(int timescale, long duration, int language, long created, long modified, int quality) {
-        super(new Header(fourcc()));
-        this.timescale = timescale;
-        this.duration = duration;
-        this.language = language;
-        this.created = created;
-        this.modified = modified;
-        this.quality = quality;
+    public static MediaHeaderBox createMediaHeaderBox(int timescale, long duration, int language, long created,
+            long modified, int quality) {
+        MediaHeaderBox mdhd = new MediaHeaderBox(new Header(fourcc()));
+        mdhd.timescale = timescale;
+        mdhd.duration = duration;
+        mdhd.language = language;
+        mdhd.created = created;
+        mdhd.modified = modified;
+        mdhd.quality = quality;
+        return mdhd;
     }
 
-    public MediaHeaderBox() {
-        super(new Header(fourcc()));
+    public int getTimescale() {
+        return timescale;
+    }
+
+    public long getDuration() {
+        return duration;
+    }
+
+    public long getCreated() {
+        return created;
+    }
+
+    public long getModified() {
+        return modified;
+    }
+
+    public int getLanguage() {
+        return language;
+    }
+
+    public int getQuality() {
+        return quality;
+    }
+
+    public void setDuration(long duration) {
+        this.duration = duration;
+    }
+
+    public void setTimescale(int timescale) {
+        this.timescale = timescale;
     }
 
     public void parse(ByteBuffer input) {
@@ -59,14 +91,6 @@ public class MediaHeaderBox extends FullBox {
         }
     }
 
-    public int getTimescale() {
-        return timescale;
-    }
-
-    public long getDuration() {
-        return duration;
-    }
-
     public void doWrite(ByteBuffer out) {
         super.doWrite(out);
         out.putInt(toMovTime(created));
@@ -75,20 +99,5 @@ public class MediaHeaderBox extends FullBox {
         out.putInt((int) duration);
         out.putShort((short) language);
         out.putShort((short) quality);
-    }
-
-    public void setDuration(long duration) {
-        this.duration = duration;
-    }
-
-    public void setTimescale(int timescale) {
-        this.timescale = timescale;
-    }
-
-    @Override
-    public void dump(StringBuilder sb) {
-        super.dump(sb);
-        sb.append(": ");
-        ToJSON.toJSON(this, sb, "created", "modified", "timescale", "duration", "language", "quality");
     }
 }

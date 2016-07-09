@@ -1,14 +1,10 @@
 package org.jcodec.movtool.streaming.tracks.avc;
+import java.lang.IllegalStateException;
+import java.lang.System;
 
-import static org.jcodec.codecs.h264.H264Utils.writePPS;
-import static org.jcodec.codecs.h264.H264Utils.writeSPS;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import static org.jcodec.codecs.h264.H264Utils.readPPSFromBufferList;
+import static org.jcodec.codecs.h264.H264Utils.readSPSFromBufferList;
 
 import org.jcodec.codecs.h264.H264Utils;
 import org.jcodec.codecs.h264.H264Utils.SliceHeaderTweaker;
@@ -17,14 +13,20 @@ import org.jcodec.codecs.h264.io.model.NALUnitType;
 import org.jcodec.codecs.h264.io.model.PictureParameterSet;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.io.model.SliceHeader;
-import org.jcodec.codecs.h264.mp4.AvcCBox;
-import org.jcodec.common.NIOUtils;
-import org.jcodec.containers.mp4.boxes.Box;
-import org.jcodec.containers.mp4.boxes.PixelAspectExt;
-import org.jcodec.containers.mp4.boxes.SampleEntry;
-import org.jcodec.containers.mp4.boxes.VideoSampleEntry;
+import org.jcodec.common.io.NIOUtils;
+import org.jcodec.common.logging.Logger;
+import org.jcodec.common.model.Rational;
+import org.jcodec.movtool.streaming.CodecMeta;
+import org.jcodec.movtool.streaming.VideoCodecMeta;
 import org.jcodec.movtool.streaming.VirtualPacket;
 import org.jcodec.movtool.streaming.VirtualTrack;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -44,62 +46,60 @@ public class AVCConcatTrack implements VirtualTrack {
     private VirtualPacket lastPacket;
     private double offsetPts = 0;
     private int offsetFn = 0;
-    private SampleEntry se;
-    private AvcCBox[] avcCs;
+    private CodecMeta se;
     private Map<Integer, Integer> map;
     private List<PictureParameterSet> allPps;
     private List<SeqParameterSet> allSps;
     private SliceHeaderTweaker[] tweakers;
 
-    public AVCConcatTrack(VirtualTrack... tracks) {
-        this.tracks = tracks;
+    public AVCConcatTrack(VirtualTrack... arguments) {
+        this.tracks = arguments;
 
-        avcCs = new AvcCBox[tracks.length];
-        PixelAspectExt pasp = null;
+        Rational pasp = null;
 
         allPps = new ArrayList<PictureParameterSet>();
         allSps = new ArrayList<SeqParameterSet>();
-        tweakers = new H264Utils.SliceHeaderTweaker[tracks.length];
-        for (int i = 0; i < tracks.length; i++) {
-            SampleEntry se = tracks[i].getSampleEntry();
-            if (!(se instanceof VideoSampleEntry))
+        tweakers = new H264Utils.SliceHeaderTweaker[arguments.length];
+        map = new HashMap<Integer, Integer>();
+        for (int i = 0; i < arguments.length; i++) {
+            CodecMeta se = arguments[i].getCodecMeta();
+            if (!(se instanceof VideoCodecMeta))
                 throw new RuntimeException("Not a video track.");
             if (!"avc1".equals(se.getFourcc()))
                 throw new RuntimeException("Not an AVC track.");
 
-            PixelAspectExt paspL = Box.findFirst(se, PixelAspectExt.class, "pasp");
-            if (pasp != null && paspL != null && !pasp.getRational().equals(paspL.getRational()))
+            VideoCodecMeta vcm = (VideoCodecMeta) se;
+
+            Rational paspL = vcm.getPasp();
+            if (pasp != null && paspL != null && !pasp.equalsRational(paspL))
                 throw new RuntimeException("Can not concat video tracks with different Pixel Aspect Ratio.");
             pasp = paspL;
 
-            AvcCBox avcC = H264Utils.parseAVCC((VideoSampleEntry) se);
-            for (ByteBuffer ppsBuffer : avcC.getPpsList()) {
+            List<ByteBuffer> rawPPSs = H264Utils.getRawPPS(se.getCodecPrivate());
+            for (ByteBuffer ppsBuffer : rawPPSs) {
                 PictureParameterSet pps = H264Utils.readPPS(NIOUtils.duplicate(ppsBuffer));
+                // Allow up to 256 SPS/PPS per clip
                 pps.pic_parameter_set_id |= i << 8;
                 pps.seq_parameter_set_id |= i << 8;
                 allPps.add(pps);
             }
-            for (ByteBuffer spsBuffer : avcC.getSpsList()) {
+            List<ByteBuffer> rawSPSs = H264Utils.getRawSPS(se.getCodecPrivate());
+            for (ByteBuffer spsBuffer : rawSPSs) {
                 SeqParameterSet sps = H264Utils.readSPS(NIOUtils.duplicate(spsBuffer));
                 sps.seq_parameter_set_id |= i << 8;
                 allSps.add(sps);
             }
-            final int idx2 = i;
-            tweakers[i] = new H264Utils.SliceHeaderTweaker(avcC.getSpsList(), avcC.getPpsList()) {
-                protected void tweak(SliceHeader sh) {
-                    sh.pic_parameter_set_id = map.get((idx2 << 8) | sh.pic_parameter_set_id);
-                }
-            };
-            avcCs[i] = avcC;
+            int idx2 = i;
+            tweakers[i] = new AvccTweaker(rawSPSs, rawPPSs, idx2, this);
         }
-        map = mergePS(allSps, allPps);
+        mergePS(allSps, allPps, map);
 
-        se = H264Utils.createMOVSampleEntry(writeSPS(allSps), writePPS(allPps));
-        if (pasp != null)
-            se.add(pasp);
+        VideoCodecMeta codecMeta = (VideoCodecMeta) arguments[0].getCodecMeta();
+
+        se = VideoCodecMeta.createVideoCodecMeta("avc1", ByteBuffer.wrap(H264Utils.saveCodecPrivate(H264Utils.saveSPS(allSps), H264Utils.savePPS(allPps))), codecMeta.getSize(), codecMeta.getPasp());
     }
 
-    private Map<Integer, Integer> mergePS(List<SeqParameterSet> allSps, List<PictureParameterSet> allPps) {
+    private void mergePS(List<SeqParameterSet> allSps, List<PictureParameterSet> allPps, Map<Integer, Integer> map) {
         List<ByteBuffer> spsRef = new ArrayList<ByteBuffer>();
         for (SeqParameterSet sps : allSps) {
             int spsId = sps.seq_parameter_set_id;
@@ -115,7 +115,6 @@ public class AVCConcatTrack implements VirtualTrack {
                     pps.seq_parameter_set_id = idx;
             }
         }
-        Map<Integer, Integer> map = new HashMap<Integer, Integer>();
         List<ByteBuffer> ppsRef = new ArrayList<ByteBuffer>();
         for (PictureParameterSet pps : allPps) {
             int ppsId = pps.pic_parameter_set_id;
@@ -141,8 +140,6 @@ public class AVCConcatTrack implements VirtualTrack {
             pps.pic_parameter_set_id = i;
             allPps.add(pps);
         }
-
-        return map;
     }
 
     @Override
@@ -156,14 +153,14 @@ public class AVCConcatTrack implements VirtualTrack {
                 offsetFn += lastPacket.getFrameNo() + 1;
             } else {
                 lastPacket = nextPacket;
-                return new AVCConcatPacket(nextPacket, offsetPts, offsetFn, idx);
+                return new AVCConcatPacket(this, nextPacket, offsetPts, offsetFn, idx);
             }
         }
         return null;
     }
 
     @Override
-    public SampleEntry getSampleEntry() {
+    public CodecMeta getCodecMeta() {
         return se;
     }
 
@@ -187,23 +184,21 @@ public class AVCConcatTrack implements VirtualTrack {
     private ByteBuffer patchPacket(final int idx2, ByteBuffer data) {
         ByteBuffer out = ByteBuffer.allocate(data.remaining() + 8);
 
-        for (ByteBuffer nal : H264Utils.splitMOVPacket(data, avcCs[idx2])) {
+        for (ByteBuffer nal : H264Utils.splitFrame(data)) {
             NALUnit nu = NALUnit.read(nal);
 
             if (nu.type == NALUnitType.IDR_SLICE || nu.type == NALUnitType.NON_IDR_SLICE) {
 
-                ByteBuffer nalSizePosition = out.duplicate();
-                out.putInt(0);
+                out.putInt(1);
                 nu.write(out);
 
                 tweakers[idx2].run(nal, out, nu);
-                nalSizePosition.putInt(out.position() - nalSizePosition.position() - 4);
             } else {
-                System.out.println(nu.type);
+                Logger.warn("Skipping NAL unit: " + nu.type);
             }
         }
         if (out.remaining() >= 5) {
-            out.putInt(out.remaining() - 4);
+            out.putInt(1);
             new NALUnit(NALUnitType.FILLER_DATA, 0).write(out);
         }
 
@@ -212,14 +207,34 @@ public class AVCConcatTrack implements VirtualTrack {
         return out;
     }
 
-    public class AVCConcatPacket implements VirtualPacket {
+    private static final class AvccTweaker extends H264Utils.SliceHeaderTweaker {
+        private final int idx2;
+        private AVCConcatTrack track;
+
+        private AvccTweaker(List<ByteBuffer> spsList, List<ByteBuffer> ppsList, int idx2, AVCConcatTrack track) {
+            super();
+            this.sps = readSPSFromBufferList(spsList);
+            this.pps = readPPSFromBufferList(ppsList);
+            this.idx2 = idx2;
+            this.track = track;
+        }
+
+        @Override
+        protected void tweak(SliceHeader sh) {
+            sh.pic_parameter_set_id = track.map.get((idx2 << 8) | sh.pic_parameter_set_id);
+        }
+    }
+
+    public static class AVCConcatPacket implements VirtualPacket {
         private VirtualPacket packet;
         private double ptsOffset;
         private int fnOffset;
         private int idx;
+		private AVCConcatTrack track;
 
-        public AVCConcatPacket(VirtualPacket packet, double ptsOffset, int fnOffset, int idx) {
-            this.packet = packet;
+        public AVCConcatPacket(AVCConcatTrack track, VirtualPacket packet, double ptsOffset, int fnOffset, int idx) {
+            this.track = track;
+			this.packet = packet;
             this.ptsOffset = ptsOffset;
             this.fnOffset = fnOffset;
             this.idx = idx;
@@ -227,7 +242,7 @@ public class AVCConcatTrack implements VirtualTrack {
 
         @Override
         public ByteBuffer getData() throws IOException {
-            return patchPacket(idx, packet.getData());
+            return track.patchPacket(idx, packet.getData());
         }
 
         @Override

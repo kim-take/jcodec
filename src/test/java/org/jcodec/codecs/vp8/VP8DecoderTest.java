@@ -1,34 +1,37 @@
 package org.jcodec.codecs.vp8;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-
-import javax.imageio.ImageIO;
-
-import org.jcodec.common.IOUtils;
-import org.jcodec.common.JCodecUtil;
-import org.jcodec.common.model.Picture;
-import org.jcodec.containers.mkv.MKVMuxerTest;
+import org.jcodec.Utils;
+import org.jcodec.common.io.NIOUtils;
+import org.jcodec.scale.AWTUtil;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
+
+import java.io.File;
+import java.io.IOException;
+
+import java.lang.System;
+import java.nio.ByteBuffer;
+import javax.imageio.ImageIO;
 
 public class VP8DecoderTest {
 
-    private byte[] bb;
+    private ByteBuffer bb;
     private VP8Decoder dec;
 
-//    public void testKF() throws Exception {
-//        dec.decode(ByteBuffer.wrap(bb));
-//        
-//        ImageIO.write(dec.getBufferedImage(), "png", MKVMuxerTest.tildeExpand("~/decoded.png"));
-//    }
+    @Ignore @Test
+    public void testKF() throws Exception {
+        dec.decode(bb.duplicate());
+        
+        ImageIO.write(AWTUtil.toBufferedImage8Bit(dec.getPicture8Bit()), "png", Utils.tildeExpand("~/decoded.png"));
+    }
     
-//    public void testKFToPicture() throws Exception {
-//        dec.decode(ByteBuffer.wrap(bb));
-//        Picture p = dec.getPicture();
-//        ImageIO.write(JCodecUtil.toBufferedImage(p), "png", MKVMuxerTest.tildeExpand("~/decoded.pic.png"));
-//    }
+    @Ignore @Test
+    public void testKFToPicture() throws Exception {
+        dec.decode(bb.duplicate());
+        ImageIO.write(AWTUtil.toBufferedImage8Bit(dec.getPicture8Bit()), "png", Utils.tildeExpand("~/decoded.pic.png"));
+    }
     
     public void pysch() throws Exception {
         int mbWidth = 4;
@@ -53,8 +56,8 @@ public class VP8DecoderTest {
     @Before
     public void setUp() throws IOException {
         String path = "src/test/resources/fr.vp8";
-        bb = IOUtils.readFileToByteArray(MKVMuxerTest.tildeExpand(path));
-        System.out.println("byte array length: " + bb.length);
+        bb = NIOUtils.fetchFromFile(new File(path));
+        System.out.println("byte array length: " + bb.remaining());
         dec = new VP8Decoder();
     }
 

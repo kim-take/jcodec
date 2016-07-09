@@ -1,8 +1,8 @@
 package org.jcodec.containers.mp4.boxes;
 
-import java.nio.ByteBuffer;
-
 import org.jcodec.common.model.Rational;
+
+import java.nio.ByteBuffer;
 
 /**
  * This class is part of JCodec ( www.jcodec.org )
@@ -21,16 +21,13 @@ public class PixelAspectExt extends Box {
         super(header);
     }
 
-    public PixelAspectExt() {
-        super(new Header(fourcc()));
+    public static PixelAspectExt createPixelAspectExt(Rational par) {
+        PixelAspectExt pasp = new PixelAspectExt(new Header(fourcc()));
+        pasp.hSpacing = par.getNum();
+        pasp.vSpacing = par.getDen();
+        return pasp;
     }
-
-    public PixelAspectExt(Rational par) {
-        this();
-        this.hSpacing = par.getNum();
-        this.vSpacing = par.getDen();
-    }
-
+    
     public void parse(ByteBuffer input) {
         hSpacing = input.getInt();
         vSpacing = input.getInt();
@@ -57,9 +54,4 @@ public class PixelAspectExt extends Box {
         return "pasp";
     }
 
-    @Override
-    public void dump(StringBuilder sb) {
-        super.dump(sb);
-        sb.append(": " + hSpacing + ":" + vSpacing);
-    }
 }

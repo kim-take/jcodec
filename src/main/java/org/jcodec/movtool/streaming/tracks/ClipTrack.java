@@ -1,12 +1,15 @@
 package org.jcodec.movtool.streaming.tracks;
+import java.lang.IllegalStateException;
+import java.lang.System;
+import java.lang.IllegalArgumentException;
+
+import org.jcodec.movtool.streaming.CodecMeta;
+import org.jcodec.movtool.streaming.VirtualPacket;
+import org.jcodec.movtool.streaming.VirtualTrack;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.jcodec.containers.mp4.boxes.SampleEntry;
-import org.jcodec.movtool.streaming.VirtualPacket;
-import org.jcodec.movtool.streaming.VirtualTrack;
 
 /**
  * This class is part of JCodec ( www.jcodec.org ) This software is distributed
@@ -55,7 +58,7 @@ public class ClipTrack implements VirtualTrack {
             return null;
         }
 
-        return new ClipPacket(nextPacket);
+        return new ClipPacket(this, nextPacket);
     }
 
     protected List<VirtualPacket> getGop(VirtualTrack src, int from) throws IOException {
@@ -73,8 +76,8 @@ public class ClipTrack implements VirtualTrack {
     }
 
     @Override
-    public SampleEntry getSampleEntry() {
-        return src.getSampleEntry();
+    public CodecMeta getCodecMeta() {
+        return src.getCodecMeta();
     }
 
     @Override
@@ -92,20 +95,23 @@ public class ClipTrack implements VirtualTrack {
         src.close();
     }
 
-    public class ClipPacket extends VirtualPacketWrapper {
+    public static class ClipPacket extends VirtualPacketWrapper {
 
-        public ClipPacket(VirtualPacket src) {
+        private ClipTrack track;
+
+		public ClipPacket(ClipTrack track, VirtualPacket src) {
             super(src);
+			this.track = track;
         }
 
         @Override
         public double getPts() {
-            return super.getPts() - startPts;
+            return super.getPts() - track.startPts;
         }
 
         @Override
         public int getFrameNo() {
-            return super.getFrameNo() - startFrame;
+            return super.getFrameNo() - track.startFrame;
         }
     }
 }
